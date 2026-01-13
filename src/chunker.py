@@ -82,11 +82,33 @@ class Chunker:
 
         # Extract imports for context
         imports = []
+        in_docstring = False
+        docstring_delim = None
+
         for i, line in enumerate(lines):
-            if line.strip().startswith(("import ", "from ")):
-                imports.append(line.strip())
-            elif line.strip() and not line.strip().startswith("#"):
-                break  # Stop at first non-import, non-comment line
+            stripped = line.strip()
+
+            # Handle docstrings (skip them)
+            if not in_docstring:
+                if stripped.startswith('"""') or stripped.startswith("'''"):
+                    docstring_delim = '"""' if stripped.startswith('"""') else "'''"
+                    # Check if docstring closes on same line
+                    if stripped.count(docstring_delim) >= 2:
+                        continue  # Single-line docstring, skip it
+                    else:
+                        in_docstring = True
+                        continue
+            else:
+                if docstring_delim in stripped:
+                    in_docstring = False
+                    docstring_delim = None
+                continue
+
+            # Extract imports
+            if stripped.startswith(("import ", "from ")):
+                imports.append(stripped)
+            elif stripped and not stripped.startswith("#"):
+                break  # Stop at first non-import, non-comment, non-docstring line
 
         import_context = "\n".join(imports) if imports else None
 
