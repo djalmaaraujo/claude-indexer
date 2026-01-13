@@ -1,7 +1,8 @@
 """Tests for the config module."""
+
 import tempfile
 from pathlib import Path
-import pytest
+
 from src import config
 
 
@@ -118,6 +119,7 @@ class TestFileFiltering:
     def test_is_code_file_python(self):
         """Test Python files are recognized as code files."""
         import tempfile
+
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as f:
             f.write(b"# test")
             assert config.is_code_file(Path(f.name)) is True
@@ -125,6 +127,7 @@ class TestFileFiltering:
     def test_is_code_file_javascript(self):
         """Test JavaScript files are recognized as code files."""
         import tempfile
+
         with tempfile.NamedTemporaryFile(suffix=".js", delete=False) as f:
             f.write(b"// test")
             assert config.is_code_file(Path(f.name)) is True
@@ -136,6 +139,7 @@ class TestFileFiltering:
     def test_is_code_file_other_extensions(self):
         """Test other code extensions are recognized."""
         import tempfile
+
         with tempfile.NamedTemporaryFile(suffix=".go", delete=False) as f:
             f.write(b"package main")
             assert config.is_code_file(Path(f.name)) is True

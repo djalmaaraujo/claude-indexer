@@ -1,8 +1,11 @@
 """Tests for indexing functionality."""
-import pytest
+
 from pathlib import Path
-from src.indexer import Indexer
+
+import pytest
+
 from src.config import get_index_path
+from src.indexer import Indexer
 
 
 @pytest.fixture
@@ -19,6 +22,7 @@ def clean_index(sample_project):
     # Clean up before
     if index_path.exists():
         import shutil
+
         shutil.rmtree(index_path)
 
     yield sample_project
@@ -26,6 +30,7 @@ def clean_index(sample_project):
     # Clean up after
     if index_path.exists():
         import shutil
+
         shutil.rmtree(index_path)
 
 

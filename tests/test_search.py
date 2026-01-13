@@ -1,6 +1,9 @@
 """Tests for search functionality."""
-import pytest
+
 from pathlib import Path
+
+import pytest
+
 from src.search import Searcher, SearchResult
 
 
@@ -13,8 +16,9 @@ def sample_project():
 def test_searcher_requires_index(sample_project):
     """Test that searcher requires an index to exist."""
     # Clean index path
-    from src.config import get_index_path
     import shutil
+
+    from src.config import get_index_path
 
     index_path = get_index_path(sample_project)
     if index_path.exists():
@@ -75,7 +79,6 @@ def test_search_integration(sample_project):
 
 def test_format_results_markdown():
     """Test markdown formatting of results."""
-    from src.search import Searcher
 
     # Create mock results
     results = [
@@ -94,8 +97,9 @@ def test_format_results_markdown():
     class MockSearcher:
         def format_results_markdown(self, results, include_context=True):
             from src.search import Searcher as RealSearcher
+
             # Create a temporary instance just to use the method
-            return RealSearcher.__dict__['format_results_markdown'](self, results, include_context)
+            return RealSearcher.__dict__["format_results_markdown"](self, results, include_context)
 
     searcher = MockSearcher()
     markdown = searcher.format_results_markdown(results, include_context=False)
@@ -123,7 +127,8 @@ def test_format_results_json():
     class MockSearcher:
         def format_results_json(self, results):
             from src.search import Searcher as RealSearcher
-            return RealSearcher.__dict__['format_results_json'](self, results)
+
+            return RealSearcher.__dict__["format_results_json"](self, results)
 
     searcher = MockSearcher()
     json_str = searcher.format_results_json(results)

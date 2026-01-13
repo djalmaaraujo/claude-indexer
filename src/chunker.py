@@ -2,11 +2,13 @@
 Smart code chunking with AST-aware splitting.
 Falls back to regex-based chunking for unsupported languages.
 """
+
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
-from src.config import CHUNK_SIZE, CHUNK_OVERLAP, MIN_CHUNK_SIZE
+from typing import List, Optional
+
+from src.config import CHUNK_OVERLAP, CHUNK_SIZE, MIN_CHUNK_SIZE
 
 
 @dataclass
@@ -27,9 +29,9 @@ class Chunker:
     def __init__(self):
         self.tree_sitter_available = False
         try:
-            import tree_sitter
-            import tree_sitter_python
-            import tree_sitter_javascript
+            import tree_sitter  # noqa: F401
+            import tree_sitter_javascript  # noqa: F401
+            import tree_sitter_python  # noqa: F401
 
             self.tree_sitter_available = True
         except ImportError:
@@ -85,7 +87,7 @@ class Chunker:
         in_docstring = False
         docstring_delim = None
 
-        for i, line in enumerate(lines):
+        for _i, line in enumerate(lines):
             stripped = line.strip()
 
             # Handle docstrings (skip them)
@@ -99,7 +101,7 @@ class Chunker:
                         in_docstring = True
                         continue
             else:
-                if docstring_delim in stripped:
+                if docstring_delim and docstring_delim in stripped:  # type: ignore[operator]
                     in_docstring = False
                     docstring_delim = None
                 continue
@@ -115,7 +117,6 @@ class Chunker:
         # Regex patterns for Python constructs
         class_pattern = re.compile(r"^class\s+(\w+)", re.MULTILINE)
         function_pattern = re.compile(r"^def\s+(\w+)", re.MULTILINE)
-        method_pattern = re.compile(r"^\s+def\s+(\w+)", re.MULTILINE)
 
         # Find all class definitions
         for match in class_pattern.finditer(content):
@@ -158,7 +159,6 @@ class Chunker:
 
             start_pos = match.start()
             start_line = content[:start_pos].count("\n") + 1
-            func_name = match.group(1)
 
             # Find the end of the function
             end_pos = self._find_python_function_end(content, start_pos)
@@ -199,7 +199,6 @@ class Chunker:
         for match in method_pattern.finditer(class_content):
             start_pos = match.start()
             start_line = class_start_line + class_content[:start_pos].count("\n")
-            method_name = match.group(1)
 
             # Find the end of the method
             end_pos = self._find_python_function_end(class_content, start_pos)
@@ -245,7 +244,7 @@ class Chunker:
                 line_indent = len(line) - len(line.lstrip())
                 if line_indent <= def_indent:
                     # Found the end
-                    return start_pos + sum(len(l) + 1 for l in lines[:i])
+                    return start_pos + sum(len(line) + 1 for line in lines[:i])
 
             pos += len(line) + 1
 
@@ -330,7 +329,6 @@ class Chunker:
         chunks = []
 
         class_pattern = re.compile(r"^class\s+(\w+)", re.MULTILINE)
-        method_pattern = re.compile(r"^\s*def\s+(\w+)", re.MULTILINE)
 
         # Find classes
         for match in class_pattern.finditer(content):

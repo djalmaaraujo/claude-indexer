@@ -1,6 +1,9 @@
 """Tests for code chunking functionality."""
-import pytest
+
 from pathlib import Path
+
+import pytest
+
 from src.chunker import Chunker, chunk_file
 
 

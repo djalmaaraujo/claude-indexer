@@ -1,6 +1,7 @@
 """
 Configuration settings for the semantic code search system.
 """
+
 import os
 from pathlib import Path
 from typing import Set
@@ -33,74 +34,134 @@ CACHE_SIZE = 1000  # LRU cache size for file reads
 # File filtering
 CODE_EXTENSIONS: Set[str] = {
     # Python
-    '.py', '.pyw', '.pyx', '.pyi',
+    ".py",
+    ".pyw",
+    ".pyx",
+    ".pyi",
     # JavaScript/TypeScript
-    '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs',
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".mjs",
+    ".cjs",
     # Web
-    '.html', '.htm', '.css', '.scss', '.sass', '.less',
-    '.vue', '.svelte',
+    ".html",
+    ".htm",
+    ".css",
+    ".scss",
+    ".sass",
+    ".less",
+    ".vue",
+    ".svelte",
     # Ruby
-    '.rb', '.rake', '.gemspec',
+    ".rb",
+    ".rake",
+    ".gemspec",
     # Go
-    '.go',
+    ".go",
     # Rust
-    '.rs',
+    ".rs",
     # Java/Kotlin
-    '.java', '.kt', '.kts',
+    ".java",
+    ".kt",
+    ".kts",
     # C/C++
-    '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.hxx',
+    ".c",
+    ".cpp",
+    ".cc",
+    ".cxx",
+    ".h",
+    ".hpp",
+    ".hxx",
     # C#
-    '.cs',
+    ".cs",
     # PHP
-    '.php',
+    ".php",
     # Swift
-    '.swift',
+    ".swift",
     # Shell
-    '.sh', '.bash', '.zsh', '.fish',
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".fish",
     # Config/Data
-    '.json', '.yaml', '.yml', '.toml', '.ini', '.xml',
-    '.env', '.env.local', '.env.production',
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".ini",
+    ".xml",
+    ".env",
+    ".env.local",
+    ".env.production",
     # Documentation
-    '.md', '.rst', '.txt',
+    ".md",
+    ".rst",
+    ".txt",
     # SQL
-    '.sql',
+    ".sql",
 }
 
 SKIP_DIRS: Set[str] = {
     # Version control
-    '.git', '.svn', '.hg', '.bzr',
+    ".git",
+    ".svn",
+    ".hg",
+    ".bzr",
     # Dependencies
-    'node_modules', 'bower_components',
-    'vendor', 'vendors',
+    "node_modules",
+    "bower_components",
+    "vendor",
+    "vendors",
     # Python
-    '__pycache__', '.pytest_cache', '.mypy_cache',
-    'venv', 'env', '.venv', '.env',
-    '.tox', 'eggs', '.eggs',
-    'dist', 'build', '*.egg-info',
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    "venv",
+    "env",
+    ".venv",
+    ".env",
+    ".tox",
+    "eggs",
+    ".eggs",
+    "dist",
+    "build",
+    "*.egg-info",
     # Ruby
-    '.bundle',
+    ".bundle",
     # IDE
-    '.vscode', '.idea', '.vs',
+    ".vscode",
+    ".idea",
+    ".vs",
     # Build outputs
-    'build', 'dist', 'out', 'target',
+    "out",
+    "target",
     # Caches
-    '.cache', '.parcel-cache', '.next', '.nuxt',
+    ".cache",
+    ".parcel-cache",
+    ".next",
+    ".nuxt",
     # OS
-    '.DS_Store', 'Thumbs.db',
+    ".DS_Store",
+    "Thumbs.db",
     # Misc
-    'coverage', '.coverage', 'htmlcov',
-    '.angular', '.gradle',
+    "coverage",
+    ".coverage",
+    "htmlcov",
+    ".angular",
+    ".gradle",
 }
 
 SKIP_FILES: Set[str] = {
-    '.DS_Store',
-    'Thumbs.db',
-    'package-lock.json',
-    'yarn.lock',
-    'pnpm-lock.yaml',
-    'Gemfile.lock',
-    'Cargo.lock',
-    'poetry.lock',
+    ".DS_Store",
+    "Thumbs.db",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "Gemfile.lock",
+    "Cargo.lock",
+    "poetry.lock",
 }
 
 # Binary/large file size limits
@@ -129,6 +190,7 @@ VERBOSE = os.getenv("VERBOSE", "").lower() in ("1", "true", "yes")
 def get_project_hash(project_path: Path) -> str:
     """Generate a unique hash for a project path."""
     import hashlib
+
     normalized_path = str(project_path.resolve())
     return hashlib.md5(normalized_path.encode()).hexdigest()[:16]
 

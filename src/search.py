@@ -2,19 +2,20 @@
 Fast semantic code search using vector similarity.
 Reads fresh file content from disk for accuracy.
 """
+
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import lancedb
 
 from src.config import (
-    get_index_path,
+    DEBUG,
     DEFAULT_TOP_K,
     MAX_TOP_K,
     RESULT_CONTEXT_LINES,
-    DEBUG,
+    get_index_path,
 )
 from src.embedder import embed
 
@@ -44,8 +45,7 @@ class Searcher:
         # Check if index exists
         if not self.db_path.exists():
             raise FileNotFoundError(
-                f"No index found for {project_path}. "
-                f"Run 'code-index {project_path}' first."
+                f"No index found for {project_path}. " f"Run 'code-index {project_path}' first."
             )
 
         # Connect to LanceDB
@@ -81,11 +81,7 @@ class Searcher:
 
         # Vector search
         search_start = time.time()
-        results = (
-            self.table.search(query_embedding)
-            .limit(top_k)
-            .to_list()
-        )
+        results = self.table.search(query_embedding).limit(top_k).to_list()
         search_time = (time.time() - search_start) * 1000
 
         if DEBUG:
@@ -160,7 +156,7 @@ class Searcher:
 
             # Extract context after
             context_end = min(len(lines), end_line + RESULT_CONTEXT_LINES)
-            context_after_lines = lines[end_line : context_end]
+            context_after_lines = lines[end_line:context_end]
             context_after = "\n".join(context_after_lines) if context_after_lines else ""
 
             return content, context_before, context_after
@@ -242,9 +238,7 @@ class Searcher:
         return json.dumps(data, indent=2)
 
 
-def search(
-    project_path: Path, query: str, top_k: int = DEFAULT_TOP_K
-) -> List[SearchResult]:
+def search(project_path: Path, query: str, top_k: int = DEFAULT_TOP_K) -> List[SearchResult]:
     """
     Convenience function to search a project.
 

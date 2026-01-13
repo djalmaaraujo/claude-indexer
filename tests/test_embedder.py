@@ -1,6 +1,6 @@
 """Tests for the embedder module."""
-import pytest
-from src.embedder import Embedder, get_embedder, embed, embed_batch
+
+from src.embedder import Embedder, embed, embed_batch, get_embedder
 
 
 class TestEmbedder:
@@ -80,7 +80,7 @@ class TestEmbedder:
 
         # Embeddings should be very similar (allowing for small floating point differences)
         assert len(emb1) == len(emb2)
-        differences = sum(abs(a - b) for a, b in zip(emb1, emb2))
+        differences = sum(abs(a - b) for a, b in zip(emb1, emb2, strict=True))
         assert differences < 1e-5  # Very small difference threshold
 
 

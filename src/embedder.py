@@ -1,10 +1,13 @@
 """
 Fast embedding generation using sentence-transformers.
 """
+
 import time
 from typing import List
+
 from sentence_transformers import SentenceTransformer
-from src.config import ST_MODEL, DEBUG
+
+from src.config import DEBUG, ST_MODEL
 
 
 class Embedder:
@@ -13,7 +16,7 @@ class Embedder:
     def __init__(self):
         print(f"Loading sentence-transformers model: {ST_MODEL}")
         self.model = SentenceTransformer(ST_MODEL)
-        print(f"✓ Model loaded")
+        print("✓ Model loaded")
 
     def __enter__(self):
         return self
@@ -39,7 +42,7 @@ class Embedder:
             elapsed = (time.time() - start_time) * 1000
             print(f"[Embedder] Embedding: {elapsed:.1f}ms")
 
-        return embedding.tolist()
+        return embedding.tolist()  # type: ignore[no-any-return]
 
     def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """

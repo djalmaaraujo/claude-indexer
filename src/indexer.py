@@ -2,36 +2,37 @@
 Code indexer with parallel processing and incremental updates.
 Builds a vector database of code chunks for fast semantic search.
 """
+
 import hashlib
 import json
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import lancedb
 import pyarrow as pa
 from rich.progress import (
+    BarColumn,
     Progress,
     SpinnerColumn,
-    TextColumn,
-    BarColumn,
     TaskProgressColumn,
+    TextColumn,
     TimeRemainingColumn,
 )
 
 from src.chunker import CodeChunk, chunk_file
 from src.config import (
-    is_code_file,
-    should_skip_dir,
-    get_index_path,
-    USE_INCREMENTAL,
-    HASH_ALGORITHM,
-    MAX_WORKERS,
-    ENABLE_PROGRESS_BAR,
     DEBUG,
     EMBEDDING_DIM,
+    ENABLE_PROGRESS_BAR,
+    HASH_ALGORITHM,
+    MAX_WORKERS,
+    USE_INCREMENTAL,
+    get_index_path,
+    is_code_file,
+    should_skip_dir,
 )
 from src.embedder import Embedder
 
@@ -76,9 +77,7 @@ class Indexer:
         try:
             with open(self.metadata_path, "r") as f:
                 data = json.load(f)
-                self.file_metadata = {
-                    path: FileMetadata(**meta) for path, meta in data.items()
-                }
+                self.file_metadata = {path: FileMetadata(**meta) for path, meta in data.items()}
         except Exception as e:
             if DEBUG:
                 print(f"Could not load metadata: {e}")
@@ -141,7 +140,9 @@ class Indexer:
 
         return files
 
-    def _process_file(self, file_path: Path) -> Tuple[Optional[List[CodeChunk]], Optional[FileMetadata]]:
+    def _process_file(
+        self, file_path: Path
+    ) -> Tuple[Optional[List[CodeChunk]], Optional[FileMetadata]]:
         """
         Process a single file and return its chunks.
         This runs in a separate process for parallel processing.
@@ -263,17 +264,19 @@ class Indexer:
             return
 
         print(f"\n📦 Created {len(all_chunks)} chunks")
-        print(f"🔢 Generating embeddings...")
+        print("🔢 Generating embeddings...")
 
         # Generate embeddings
         embed_start = time.time()
         embeddings = self._generate_embeddings(all_chunks)
         embed_time = time.time() - embed_start
 
-        print(f"⚡ Embeddings generated in {embed_time:.1f}s ({len(embeddings)/embed_time:.1f} chunks/s)")
+        print(
+            f"⚡ Embeddings generated in {embed_time:.1f}s ({len(embeddings)/embed_time:.1f} chunks/s)"
+        )
 
         # Store in LanceDB
-        print(f"💾 Storing in vector database...")
+        print("💾 Storing in vector database...")
         self._store_in_db(all_chunks, embeddings)
 
         # Update metadata
@@ -305,23 +308,25 @@ class Indexer:
         with Embedder() as embedder:
             embeddings = embedder.embed_batch(texts)
 
-        return embeddings
+        return embeddings  # type: ignore[no-any-return]
 
     def _store_in_db(self, chunks: List[CodeChunk], embeddings: List[List[float]]):
         """Store chunks and embeddings in LanceDB."""
         # Prepare data for LanceDB
         data = []
-        for chunk, embedding in zip(chunks, embeddings):
-            data.append({
-                "id": f"{chunk.file_path}:{chunk.start_line}-{chunk.end_line}",
-                "file_path": chunk.file_path,
-                "start_line": chunk.start_line,
-                "end_line": chunk.end_line,
-                "chunk_type": chunk.chunk_type,
-                "context": chunk.context or "",
-                "content": chunk.content,
-                "vector": embedding,
-            })
+        for chunk, embedding in zip(chunks, embeddings, strict=True):
+            data.append(
+                {
+                    "id": f"{chunk.file_path}:{chunk.start_line}-{chunk.end_line}",
+                    "file_path": chunk.file_path,
+                    "start_line": chunk.start_line,
+                    "end_line": chunk.end_line,
+                    "chunk_type": chunk.chunk_type,
+                    "context": chunk.context or "",
+                    "content": chunk.content,
+                    "vector": embedding,
+                }
+            )
 
         # Connect to LanceDB
         db = lancedb.connect(str(self.index_path))
@@ -333,16 +338,18 @@ class Indexer:
             table.add(data)
         else:
             # Create new table
-            schema = pa.schema([
-                pa.field("id", pa.string()),
-                pa.field("file_path", pa.string()),
-                pa.field("start_line", pa.int64()),
-                pa.field("end_line", pa.int64()),
-                pa.field("chunk_type", pa.string()),
-                pa.field("context", pa.string()),
-                pa.field("content", pa.string()),
-                pa.field("vector", pa.list_(pa.float32(), EMBEDDING_DIM)),
-            ])
+            schema = pa.schema(
+                [
+                    pa.field("id", pa.string()),
+                    pa.field("file_path", pa.string()),
+                    pa.field("start_line", pa.int64()),
+                    pa.field("end_line", pa.int64()),
+                    pa.field("chunk_type", pa.string()),
+                    pa.field("context", pa.string()),
+                    pa.field("content", pa.string()),
+                    pa.field("vector", pa.list_(pa.float32(), EMBEDDING_DIM)),
+                ]
+            )
             db.create_table("chunks", data=data, schema=schema, mode="overwrite")
 
     def _print_stats(self):
@@ -357,8 +364,8 @@ class Indexer:
         print(f"Chunks created:    {self.stats['chunks_created']}")
         print(f"Total time:        {self.stats['total_time']:.2f}s")
 
-        if self.stats['files_indexed'] > 0:
-            avg_time = self.stats['total_time'] / self.stats['files_indexed']
+        if self.stats["files_indexed"] > 0:
+            avg_time = self.stats["total_time"] / self.stats["files_indexed"]
             print(f"Avg time/file:     {avg_time:.3f}s")
 
         print("=" * 50)

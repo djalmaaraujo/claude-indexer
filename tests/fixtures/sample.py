@@ -1,5 +1,5 @@
 """Sample Python file for testing code chunking."""
-import os
+
 from typing import List
 
 
