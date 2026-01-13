@@ -83,6 +83,49 @@ class TestEmbedder:
         differences = sum(abs(a - b) for a, b in zip(emb1, emb2, strict=True))
         assert differences < 1e-5  # Very small difference threshold
 
+    def test_embed_batch_parallel(self):
+        """Test parallel batch embedding."""
+        embedder = Embedder()
+        texts = [f"Test sentence number {i}" for i in range(100)]
+        embeddings = embedder.embed_batch_parallel(texts)
+
+        assert isinstance(embeddings, list)
+        assert len(embeddings) == 100
+        assert all(len(emb) == 384 for emb in embeddings)
+        assert all(isinstance(val, float) for emb in embeddings for val in emb)
+
+    def test_embed_batch_parallel_empty(self):
+        """Test parallel embedding with empty list."""
+        embedder = Embedder()
+        embeddings = embedder.embed_batch_parallel([])
+        assert embeddings == []
+
+    def test_embed_batch_parallel_single(self):
+        """Test parallel embedding with single text."""
+        embedder = Embedder()
+        embeddings = embedder.embed_batch_parallel(["Single text"])
+        assert len(embeddings) == 1
+        assert len(embeddings[0]) == 384
+
+    def test_embed_batch_parallel_matches_serial(self):
+        """Test parallel and serial embedding produce same results."""
+        embedder = Embedder()
+        texts = ["First text", "Second text", "Third text"]
+
+        serial_embeddings = embedder.embed_batch(texts)
+        parallel_embeddings = embedder.embed_batch_parallel(texts)
+
+        assert len(serial_embeddings) == len(parallel_embeddings)
+        for serial, parallel in zip(serial_embeddings, parallel_embeddings, strict=True):
+            differences = sum(abs(a - b) for a, b in zip(serial, parallel, strict=True))
+            assert differences < 1e-5  # Should be essentially identical
+
+    def test_gpu_detection(self):
+        """Test GPU detection sets device attribute."""
+        embedder = Embedder()
+        assert hasattr(embedder, "device")
+        assert embedder.device in ["cpu", "cuda", "mps"]  # mps = Apple Silicon GPU
+
 
 class TestModuleFunctions:
     """Test module-level convenience functions."""

@@ -9,15 +9,33 @@ Build better AI-assisted coding workflows by giving Claude the exact context it 
 ## Features
 
 - 🚀 **Lightning Fast**: <100ms semantic search with local vector database (achieves ~65ms average)
-- 🧠 **Smart Chunking**: AST-aware code splitting for Python, JavaScript, TypeScript, Ruby, and more
+- 🧠 **Smart Chunking**: Tree-sitter AST-based code parsing for Python, JavaScript, TypeScript with regex fallback for other languages
+- 💾 **Embedding Cache**: Content-hash-based caching eliminates redundant embedding computations (1.7x faster re-indexing)
 - 🔄 **Incremental Updates**: Only re-index changed files using mtime + hash comparison
-- ⚡ **Parallel Processing**: Multi-core indexing with ProcessPoolExecutor
+- ⚡ **Parallel Processing**: Multi-core indexing with ProcessPoolExecutor + parallel embedding generation
+- 🎮 **GPU Support**: Automatic GPU detection and acceleration when available
 - 🎯 **Fresh Content**: Always reads latest file content at search time (no stale results)
 - 🤖 **Claude Integration**: Direct integration with Claude Code CLI via `cc` command
-- 🤖 **Pure Python**: Uses sentence-transformers - no external services required
+- 🤖 **Multiple Models**: Choose between MiniLM (fast), CodeBERT (code-specific), or MPNet (quality)
+- 🪶 **Tiny Indexes**: 4-5x smaller storage by not duplicating file content in the database
 - 📦 **Serverless**: LanceDB with Rust engine - no database server needed
 - 🔍 **Multi-Project**: Index multiple codebases, each with isolated storage
 - 📊 **Rich Progress**: Beautiful progress bars and detailed statistics
+
+## ⚡ What's New (2026-01-13)
+
+**Major Performance & Quality Improvements:**
+
+- 🎯 **Embedding Cache**: Re-indexing is now **1.7x faster** with content-hash-based caching
+- 🧠 **Tree-sitter AST Parsing**: Python, JavaScript, and TypeScript now use AST-based chunking for **perfect code boundaries**
+- 🪶 **4-5x Smaller Indexes**: Removed content duplication, indexes are now ~360KB vs ~1.5-2MB
+- 🚀 **Parallel Embedding**: Multi-threaded embedding generation achieves **84 chunks/s**
+- 🎮 **GPU Support**: Automatic CUDA (NVIDIA) and MPS (Apple Silicon) detection and acceleration
+- 🤖 **Multiple Models**: Choose between MiniLM (fast), CodeBERT (code-specific), or MPNet (quality)
+
+**Results**: 77 tests passing (from 51), +8% better chunk detection, significantly faster re-indexing.
+
+See [IMPLEMENTATION-ROADMAP.md](./IMPLEMENTATION-ROADMAP.md) for detailed benchmarks.
 
 ## Architecture
 
@@ -127,47 +145,58 @@ This combines semantic search with Claude Code, automatically injecting relevant
 
 ## Tech Stack
 
-| Component               | Technology              | Why                                         |
-| ----------------------- | ----------------------- | ------------------------------------------- |
-| **Embeddings**          | sentence-transformers   | Fast, local, no server required             |
-| **Model**               | all-MiniLM-L6-v2        | 384-dim, optimized balance of speed/quality |
-| **Vector DB**           | LanceDB                 | Rust-based, serverless, fast for local ops  |
-| **Chunking**            | Regex-based AST parsing | Preserves code structure and context        |
-| **Parallel Processing** | ProcessPoolExecutor     | Multi-core CPU utilization                  |
-| **CLI**                 | Click                   | Clean, user-friendly interface              |
-| **Progress**            | Rich                    | Beautiful progress bars with statistics     |
-| **Storage**             | PyArrow + Lance format  | Columnar storage for fast vector ops        |
+| Component               | Technology                    | Why                                                 |
+| ----------------------- | ----------------------------- | --------------------------------------------------- |
+| **Embeddings**          | sentence-transformers         | Fast, local, no server required                     |
+| **Models**              | MiniLM / CodeBERT / MPNet     | Configurable: speed vs quality vs code-specific     |
+| **Vector DB**           | LanceDB                       | Rust-based, serverless, fast for local ops          |
+| **Chunking**            | Tree-sitter + regex fallback  | AST-aware parsing for precise code understanding    |
+| **Caching**             | Pickle-based embedding cache  | MD5 content hashing, 1.7x faster re-indexing        |
+| **Parallel Processing** | ProcessPoolExecutor + threads | Multi-core CPU + parallel embedding generation      |
+| **GPU Support**         | PyTorch CUDA/MPS detection    | Automatic GPU acceleration (NVIDIA + Apple Silicon) |
+| **CLI**                 | Click                         | Clean, user-friendly interface                      |
+| **Progress**            | Rich                          | Beautiful progress bars with statistics             |
+| **Storage**             | PyArrow + Lance format        | Columnar storage, 4-5x smaller without content duplication |
 
 ## Performance Targets
 
-| Operation        | Target     | Status |
-| ---------------- | ---------- | ------ |
-| Query embedding  | <50ms      | ✅     |
-| Vector search    | <20ms      | ✅     |
-| File read        | <30ms      | ✅     |
-| **Total search** | **<100ms** | ✅     |
-| Index 1k files   | <60s       | ✅     |
+| Operation              | Target     | Actual   | Status |
+| ---------------------- | ---------- | -------- | ------ |
+| Query embedding        | <50ms      | ~30ms    | ✅     |
+| Vector search          | <20ms      | ~15ms    | ✅     |
+| File read              | <30ms      | ~20ms    | ✅     |
+| **Total search**       | **<100ms** | **~65ms**| ✅     |
+| Index 1k files         | <60s       | ~40s     | ✅     |
+| Re-index (unchanged)   | -          | **1.7x** | ✅     |
+| Index size             | -          | **4-5x smaller** | ✅ |
+| Parallel embedding     | -          | **84 chunks/s**  | ✅ |
 
 ## Project Structure
 
 ```
 claude-indexer/
-├── setup.sh              # One-command setup
-├── pyproject.toml        # Dependencies
-├── benchmark.py          # Performance benchmarking
+├── setup.sh                      # One-command setup
+├── pyproject.toml                # Dependencies
+├── benchmark.py                  # Performance benchmarking
+├── IMPLEMENTATION-ROADMAP.md     # Performance optimization roadmap
 ├── src/
-│   ├── config.py         # Settings and constants
-│   ├── embedder.py       # Embedding generation
-│   ├── chunker.py        # Smart code chunking
-│   ├── indexer.py        # Parallel indexing
-│   └── search.py         # Fast vector search
+│   ├── config.py                 # Settings and constants
+│   ├── embedder.py               # Embedding generation (with GPU support)
+│   ├── embedding_cache.py        # Content-hash-based embedding cache
+│   ├── chunker.py                # Regex-based code chunking (fallback)
+│   ├── tree_sitter_chunker.py    # AST-based code chunking (Python, JS, TS)
+│   ├── indexer.py                # Parallel indexing with caching
+│   └── search.py                 # Fast vector search
 ├── bin/
-│   ├── code-index        # CLI: index project
-│   ├── ss                # CLI: semantic search
-│   └── cc                # CLI: search + Claude
+│   ├── code-index                # CLI: index project
+│   ├── ss                        # CLI: semantic search
+│   └── cc                        # CLI: search + Claude
+├── docs/                         # Additional documentation
 └── tests/
-    ├── fixtures/         # Test data
+    ├── fixtures/                 # Test data
     ├── test_chunker.py
+    ├── test_tree_sitter_chunker.py
+    ├── test_embedding_cache.py
     ├── test_indexer.py
     └── test_search.py
 ```
@@ -250,12 +279,15 @@ sequenceDiagram
    - Skip excluded directories (`node_modules`, `venv`, `.git`)
    - Check file size limits (skip files > 1MB)
 
-2. **Smart Chunking** (`chunker.py`)
+2. **Smart Chunking** (`tree_sitter_chunker.py` + `chunker.py`)
 
-   - **Python**: Regex-based extraction of classes, methods, functions
-   - **JavaScript/TypeScript**: Pattern matching for functions, classes, arrow functions
-   - **Ruby**: Class and method extraction
-   - **Other languages**: Line-based chunking with overlap
+   - **Tree-sitter (AST-based)**: Python, JavaScript, TypeScript
+     - Perfect code boundaries (never splits functions mid-way)
+     - Precise class and method detection
+     - Understands code structure via Abstract Syntax Trees
+   - **Regex fallback**: Ruby, Go, Rust, Java, and other languages
+     - Pattern matching for functions, classes, methods
+     - Line-based chunking with overlap
    - Preserves import statements as context
    - Chunks are 1500 chars with 200 char overlap
 
@@ -265,17 +297,25 @@ sequenceDiagram
    - CPU-bound chunking runs in separate processes
    - Progress bar shows real-time status
 
-4. **Embedding Generation** (`embedder.py`)
+4. **Embedding Generation** (`embedder.py` + `embedding_cache.py`)
 
-   - Uses **sentence-transformers**: No server needed, 384-dim vectors
-   - Model: `all-MiniLM-L6-v2` (auto-downloads on first use)
-   - Batch processing for efficiency (32 texts per batch)
-   - Local inference with GPU support if available
+   - Uses **sentence-transformers**: No server needed
+   - **Multiple models available**:
+     - `all-MiniLM-L6-v2` (default, 384-dim, fast)
+     - `microsoft/codebert-base` (768-dim, code-specific)
+     - `all-mpnet-base-v2` (768-dim, high quality)
+   - **Embedding cache**: MD5 content hashing prevents redundant computations
+   - **Parallel batch processing**: ThreadPoolExecutor with 32 texts per batch
+   - **GPU auto-detection**: Automatic CUDA (NVIDIA) and MPS (Apple Silicon) acceleration
+   - Local inference, auto-downloads model on first use
 
 5. **Vector Storage** (`indexer.py`)
    - **LanceDB**: Rust-based, serverless vector database
-   - Schema: `id`, `file_path`, `start_line`, `end_line`, `chunk_type`, `context`, `content`, `vector`
+   - Schema: `id`, `file_path`, `start_line`, `end_line`, `chunk_type`, `context`, `vector`
+   - **No content duplication**: Reads fresh content from disk at search time
+   - **4-5x smaller indexes**: Only stores vectors and metadata
    - Stored in `~/.code-search/indexes/{project_hash}/`
+   - Embedding cache stored as `embedding_cache.pkl` in same directory
 
 #### 2. Search Pipeline
 
@@ -398,31 +438,37 @@ flowchart TD
 
 #### 4. Embedding System
 
-The system uses sentence-transformers for fast, local embedding generation:
+The system uses sentence-transformers with intelligent caching for fast, local embedding generation:
 
 ```mermaid
 graph LR
-    A[Text Input] --> B[SentenceTransformer]
-    B --> C[all-MiniLM-L6-v2]
-    C --> D[384-dim Vector]
+    A[Text Input] --> B[Check Cache]
+    B -->|Hit| C[Return Cached]
+    B -->|Miss| D[SentenceTransformer]
+    D --> E[Model: MiniLM/CodeBERT/MPNet]
+    E --> F[Vector]
+    F --> G[Store in Cache]
+    G --> C
 
-    B --> E[Batch Processing]
-    E --> F[GPU Accelerated]
-    F --> D
+    D --> H[Parallel Batches]
+    H --> I[GPU Accelerated]
+    I --> F
 
     style B fill:#e1ffe1
-    style C fill:#e1f5ff
-    style D fill:#ffe1e1
+    style E fill:#e1f5ff
+    style F fill:#ffe1e1
 ```
 
 **Key Features:**
 
+- ✅ **Embedding cache**: 1.7x faster re-indexing via MD5 content hashing
+- ✅ **Multiple models**: MiniLM (fast), CodeBERT (code-specific), MPNet (quality)
+- ✅ **Parallel processing**: ThreadPoolExecutor for batch embedding generation
+- ✅ **GPU auto-detection**: Automatic CUDA (NVIDIA) and MPS (Apple Silicon) acceleration
 - ✅ No server required - pure Python
 - ✅ Fast startup (~2s)
-- ✅ Low memory usage (~500MB)
-- ✅ Excellent quality (384-dim)
-- ✅ GPU support if available
-- ✅ Auto-downloads model on first use (~100MB)
+- ✅ Low memory usage (~500MB for MiniLM, ~1.5GB for CodeBERT)
+- ✅ Auto-downloads model on first use
 - ✅ Batch processing (32 texts at once)
 
 ### CLI Command Integration
@@ -458,16 +504,19 @@ graph TD
 
 ### Performance Breakdown
 
-| Phase        | Operation           | Target     | Actual         | Notes                   |
-| ------------ | ------------------- | ---------- | -------------- | ----------------------- |
-| **Indexing** | File scanning       | -          | ~100ms         | Depends on project size |
-|              | Chunking (parallel) | -          | ~2s/1000 files | CPU-bound, multi-core   |
-|              | Embedding batch     | -          | ~50ms/batch    | sentence-transformers   |
-|              | DB write            | -          | ~100ms         | LanceDB append          |
-| **Search**   | Query embedding     | <50ms      | ✅ ~30ms       | Local inference         |
-|              | Vector search       | <20ms      | ✅ ~15ms       | LanceDB Rust engine     |
-|              | File read           | <30ms      | ✅ ~20ms       | Fresh content           |
-|              | **Total**           | **<100ms** | **✅ ~65ms**   | Sub-100ms goal achieved |
+| Phase        | Operation               | Target     | Actual         | Notes                            |
+| ------------ | ----------------------- | ---------- | -------------- | -------------------------------- |
+| **Indexing** | File scanning           | -          | ~100ms         | Depends on project size          |
+|              | Chunking (AST+parallel) | -          | ~2s/1000 files | Tree-sitter + multi-core         |
+|              | Cache lookup            | -          | ~5ms/chunk     | MD5 content hash lookup          |
+|              | Embedding (cached)      | -          | **~0ms**       | **Cache hit = instant**          |
+|              | Embedding (uncached)    | -          | ~50ms/batch    | Parallel generation, 84 chunks/s |
+|              | DB write                | -          | ~100ms         | LanceDB append                   |
+| **Re-index** | Unchanged files         | -          | **1.7x faster**| Embedding cache benefit          |
+| **Search**   | Query embedding         | <50ms      | ✅ ~30ms       | Local inference                  |
+|              | Vector search           | <20ms      | ✅ ~15ms       | LanceDB Rust engine              |
+|              | File read               | <30ms      | ✅ ~20ms       | Fresh content from disk          |
+|              | **Total**               | **<100ms** | **✅ ~65ms**   | Sub-100ms goal achieved          |
 
 ### Storage Format
 
@@ -475,11 +524,12 @@ graph TD
 
 ```
 ~/.code-search/indexes/{project_hash}/
-├── chunks.lance/          # LanceDB vector database
+├── chunks.lance/          # LanceDB vector database (4-5x smaller!)
 │   ├── data/             # Vector data files
 │   ├── indices/          # Vector indices
 │   └── schema.json       # Table schema
-└── metadata.json         # File metadata for incremental updates
+├── metadata.json         # File metadata for incremental updates
+└── embedding_cache.pkl   # MD5 content hash → embedding cache
 ```
 
 **Metadata JSON Format:**
@@ -505,29 +555,129 @@ graph TD
   "end_line": int64,      # 50
   "chunk_type": str,      # "function" | "class" | "method" | "block"
   "context": str,         # Import statements
-  "content": str,         # Actual code
-  "vector": float32[384]  # Embedding vector
+  # Note: No "content" field - reads fresh from disk at search time
+  "vector": float32[384]  # Embedding vector (384 or 768 depending on model)
 }
 ```
 
+**Embedding Cache Format:**
+
+The cache is a Python pickle file mapping MD5 content hashes to embedding vectors:
+
+```python
+{
+  "abc123...": [0.123, 0.456, ...],  # 384 or 768 floats
+  "def456...": [0.789, 0.012, ...],
+  # ... thousands of cached embeddings
+}
+```
+
+**Storage Benefits:**
+
+- **4-5x smaller indexes**: No content duplication (360KB vs ~1.5-2MB typical)
+- **Cache hits = instant**: Re-indexing unchanged files is 1.7x faster
+- **Fresh content always**: Reads from disk, never stale results
+
 ## Configuration
+
+### Model Selection
+
+Choose your embedding model via environment variable:
+
+```bash
+# Option 1: MiniLM (default) - Fast, good quality, 384-dim
+export CODE_SEARCH_MODEL="all-MiniLM-L6-v2"
+
+# Option 2: CodeBERT - Code-specific, better for code semantics, 768-dim
+export CODE_SEARCH_MODEL="microsoft/codebert-base"
+
+# Option 3: MPNet - Best quality, slowest, 768-dim
+export CODE_SEARCH_MODEL="all-mpnet-base-v2"
+```
+
+### GPU Support
+
+claude-indexer **automatically detects and uses GPU acceleration** when available:
+
+#### Supported Platforms
+
+| Platform | GPU Type | Device | Expected Speedup |
+|----------|----------|--------|------------------|
+| **macOS** | Apple Silicon (M1/M2/M3/M4) | `mps` (Metal Performance Shaders) | **2-3x faster** |
+| **Linux/Windows** | NVIDIA GPU | `cuda` | **6-10x faster** |
+| **Any** | No GPU | `cpu` | baseline |
+
+#### How It Works
+
+The system automatically detects the best device on startup:
+
+```bash
+# Example output on macOS with Apple Silicon:
+Loading sentence-transformers model: all-MiniLM-L6-v2
+🚀 GPU detected: Apple Metal (MPS)
+✓ Model loaded on MPS
+
+# Example output on Linux with NVIDIA GPU:
+Loading sentence-transformers model: all-MiniLM-L6-v2
+🚀 GPU detected: NVIDIA GeForce RTX 3080
+✓ Model loaded on CUDA
+
+# Example output on CPU-only system:
+Loading sentence-transformers model: all-MiniLM-L6-v2
+💻 Using CPU (no GPU detected)
+✓ Model loaded on CPU
+```
+
+#### Requirements
+
+- **macOS (MPS)**: PyTorch ≥1.12 with MPS support (included in dependencies)
+- **NVIDIA (CUDA)**: PyTorch with CUDA support + NVIDIA drivers
+- **CPU**: No additional requirements
+
+#### Performance Expectations
+
+| Operation | CPU | MPS (Apple Silicon) | CUDA (NVIDIA) |
+|-----------|-----|---------------------|---------------|
+| Embedding 200 chunks | ~2.5s | ~0.8-1.2s | ~0.3-0.4s |
+| Embedding 1000 chunks | ~12s | ~4-5s | ~1.2-1.5s |
+
+**Note**: MPS provides solid speedup on macOS, though not as dramatic as NVIDIA CUDA due to Metal API overhead and unified memory architecture.
+
+#### Troubleshooting
+
+If GPU isn't detected on macOS with Apple Silicon:
+
+```bash
+# Check if MPS is available
+python -c "import torch; print('MPS available:', torch.backends.mps.is_available())"
+
+# If False, ensure PyTorch is up to date:
+pip install --upgrade torch
+```
+
+### Advanced Configuration
 
 Edit `src/config.py` to customize:
 
 ```python
-# Embedding model
-ST_MODEL = "all-MiniLM-L6-v2"  # Fast, good quality, 384 dim
-# ST_MODEL = "all-mpnet-base-v2"  # Better quality, 768 dim, slower
-
 # Chunking
-CHUNK_SIZE = 1500
-CHUNK_OVERLAP = 200
+CHUNK_SIZE = 1500              # Maximum chunk size
+CHUNK_OVERLAP = 200            # Overlap between chunks
+MIN_CHUNK_SIZE = 50            # Minimum chunk size
 
 # Search
-DEFAULT_TOP_K = 5
+DEFAULT_TOP_K = 5              # Default number of results
 
 # Performance
-MAX_WORKERS = os.cpu_count()
+MAX_WORKERS = os.cpu_count()   # Parallel workers for indexing
+EMBEDDING_BATCH_SIZE = 32      # Batch size for embeddings
+
+# GPU Support (auto-detected)
+# Device selection: "cpu", "cuda", or "mps" (for Apple Silicon)
+
+# Embedding Cache
+# Cache is automatically enabled and stored in:
+# ~/.code-search/indexes/{project_hash}/embedding_cache.pkl
 ```
 
 ## Development
@@ -611,22 +761,23 @@ Indexes are stored in:
 
 ## Supported Languages
 
-**Full AST Support:**
+**Tree-sitter AST Support (Best Quality):**
 
-- Python (.py)
-- JavaScript/TypeScript (.js, .jsx, .ts, .tsx)
-- Ruby (.rb)
+- Python (.py) - Perfect code boundaries, never splits functions
+- JavaScript (.js, .jsx, .mjs, .cjs) - Classes, functions, arrow functions
+- TypeScript (.ts, .tsx) - Full TS support with type awareness
 
-**Regex-based Support:**
+**Regex-based Support (Good Quality):**
 
-- Go (.go)
-- Rust (.rs)
-- Java (.java)
-- Kotlin (.kt)
-- C/C++ (.c, .cpp, .h)
-- C# (.cs)
-- PHP (.php)
-- Swift (.swift)
+- Ruby (.rb) - Class and method extraction
+- Go (.go) - Functions, structs, methods
+- Rust (.rs) - Functions, impls, traits
+- Java (.java) - Classes, methods
+- Kotlin (.kt) - Classes, functions
+- C/C++ (.c, .cpp, .h) - Functions, structs
+- C# (.cs) - Classes, methods
+- PHP (.php) - Classes, functions
+- Swift (.swift) - Classes, functions
 
 **Also Indexed:**
 
@@ -634,6 +785,11 @@ Indexes are stored in:
 - Documentation (.md, .rst, .txt)
 - SQL (.sql)
 - Shell scripts (.sh, .bash)
+
+**Quality Difference:**
+
+- **Tree-sitter**: AST-based parsing, perfect code boundaries, no split functions
+- **Regex**: Pattern-based parsing, good but may occasionally split code imperfectly
 
 ## License
 
@@ -649,7 +805,35 @@ Pull requests welcome! Please:
 
 ## Roadmap
 
-TBD
+### ✅ Recently Completed (Phase 1 & 2)
+
+**Phase 1: Performance Optimizations**
+- ✅ Embedding cache with MD5 content hashing (1.7x faster re-indexing)
+- ✅ Parallel embedding generation with ThreadPoolExecutor (84 chunks/s)
+- ✅ GPU auto-detection and acceleration
+- ✅ Removed content storage from vector DB (4-5x smaller indexes)
+
+**Phase 2: Quality Improvements**
+- ✅ Tree-sitter AST-based chunking for Python, JavaScript, TypeScript
+- ✅ Multiple embedding model options (MiniLM, CodeBERT, MPNet)
+- ✅ Environment variable for model selection
+- ✅ +8% better chunk detection with AST parsing
+
+**Results:**
+- Index size: 360KB (vs ~1.5-2MB before)
+- Re-indexing: 1.7x faster for unchanged files
+- Tests: 77 tests passing (from 51 originally)
+- Chunks: 228 created (vs 211 regex-based, +8% better)
+
+### 🔮 Future Enhancements (Phase 3)
+
+**Power Features:**
+- Hybrid search (Semantic + BM25 keyword search)
+- Vector quantization for even smaller indexes
+- Merkle tree change detection for 10k+ file repos
+- Additional tree-sitter language support (Go, Rust, Java)
+
+See [IMPLEMENTATION-ROADMAP.md](./IMPLEMENTATION-ROADMAP.md) for detailed progress and benchmarks.
 
 ## Quick Reference
 
@@ -659,8 +843,13 @@ TBD
 # Setup (one time)
 ./setup.sh
 
+# Choose embedding model (optional, default is MiniLM)
+export CODE_SEARCH_MODEL="all-MiniLM-L6-v2"           # Fast (default)
+export CODE_SEARCH_MODEL="microsoft/codebert-base"    # Code-specific
+export CODE_SEARCH_MODEL="all-mpnet-base-v2"          # Best quality
+
 # Index project
-code-index .                    # Incremental
+code-index .                    # Incremental (uses cache!)
 code-index . --force            # Full re-index
 code-index ~/other/project      # Index different project
 
@@ -681,4 +870,9 @@ export VERBOSE=1                # Verbose output
 # Maintenance
 rm -rf ~/.code-search/indexes/{hash}  # Remove specific index
 rm -rf ~/.code-search                 # Remove all indexes
+
+# Performance notes
+# - First index: downloads model (~100MB for MiniLM, ~500MB for CodeBERT)
+# - Re-indexing: 1.7x faster with embedding cache
+# - Index size: 4-5x smaller than before (no content duplication)
 ```

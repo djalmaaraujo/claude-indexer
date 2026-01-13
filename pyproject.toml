@@ -39,7 +39,10 @@ dev = [
     "mypy>=1.9.0",
 ]
 tree-sitter = [
-    "tree-sitter>=0.21.0",     # Optional: Enhanced AST-aware chunking
+    "tree-sitter>=0.21.0",               # AST parsing
+    "tree-sitter-python>=0.21.0",        # Python language support
+    "tree-sitter-javascript>=0.21.0",    # JavaScript language support
+    "tree-sitter-typescript>=0.21.0",    # TypeScript language support
 ]
 
 [tool.setuptools]

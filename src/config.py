@@ -6,12 +6,44 @@ import os
 from pathlib import Path
 from typing import Set
 
-# Sentence Transformers settings
-ST_MODEL = "all-MiniLM-L6-v2"  # Fast, good quality, 384 dim
-# ST_MODEL = "all-mpnet-base-v2"  # Better quality, 768 dim, slower
+# ===================================================================
+# EMBEDDING MODEL CONFIGURATION
+# ===================================================================
+# Choose your embedding model based on your needs:
+#
+# Option 1: all-MiniLM-L6-v2 (DEFAULT - Recommended for most users)
+#   - Speed: FAST (30ms per embedding)
+#   - Quality: Good
+#   - Size: 90MB
+#   - Dimensions: 384
+#   - Best for: General code search, fast indexing
+#
+# Option 2: microsoft/codebert-base (Code-specific model)
+#   - Speed: Medium (45ms per embedding)
+#   - Quality: Better for code understanding
+#   - Size: 500MB
+#   - Dimensions: 768
+#   - Best for: Better code semantics, willing to trade speed
+#
+# Option 3: all-mpnet-base-v2 (High quality general model)
+#   - Speed: Medium (45ms per embedding)
+#   - Quality: Excellent
+#   - Size: 420MB
+#   - Dimensions: 768
+#   - Best for: Best overall quality, not code-specific
+# ===================================================================
 
-# Embedding dimensions
-EMBEDDING_DIM = 384
+ST_MODEL = os.environ.get("CODE_SEARCH_MODEL", "all-MiniLM-L6-v2")
+
+# Model dimensions mapping
+MODEL_DIMENSIONS = {
+    "all-MiniLM-L6-v2": 384,
+    "all-mpnet-base-v2": 768,
+    "microsoft/codebert-base": 768,
+}
+
+# Get embedding dimensions for the selected model
+EMBEDDING_DIM = MODEL_DIMENSIONS.get(ST_MODEL, 384)
 EMBEDDING_MODEL = ST_MODEL
 
 # Chunking settings

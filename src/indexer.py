@@ -35,6 +35,7 @@ from src.config import (
     should_skip_dir,
 )
 from src.embedder import Embedder
+from src.embedding_cache import EmbeddingCache
 
 
 @dataclass
@@ -56,11 +57,15 @@ class Indexer:
         self.index_path = get_index_path(self.project_path)
         self.db_path = self.index_path / "chunks.lance"  # Table name matches what we create
         self.metadata_path = self.index_path / "metadata.json"
+        self.cache_path = self.index_path / "embedding_cache.pkl"
 
         # Load existing metadata
         self.file_metadata: Dict[str, FileMetadata] = {}
         if not force and self.metadata_path.exists():
             self._load_metadata()
+
+        # Initialize embedding cache
+        self.embedding_cache = EmbeddingCache(self.cache_path) if not force else None
 
         # Stats
         self.stats = {
@@ -69,6 +74,8 @@ class Indexer:
             "files_skipped": 0,
             "files_unchanged": 0,
             "chunks_created": 0,
+            "cache_hits": 0,
+            "cache_misses": 0,
             "total_time": 0.0,
         }
 
@@ -283,13 +290,17 @@ class Indexer:
         self.file_metadata.update(new_metadata)
         self._save_metadata()
 
+        # Save embedding cache
+        if self.embedding_cache:
+            self.embedding_cache.save()
+
         self.stats["total_time"] = time.time() - start_time
 
         # Print stats
         self._print_stats()
 
     def _generate_embeddings(self, chunks: List[CodeChunk]) -> List[List[float]]:
-        """Generate embeddings for chunks."""
+        """Generate embeddings for chunks with caching."""
         # Prepare texts for embedding
         texts = []
         for chunk in chunks:
@@ -304,9 +315,33 @@ class Indexer:
             text = "\n\n".join(text_parts)
             texts.append(text)
 
-        # Generate embeddings in batches
-        with Embedder() as embedder:
-            embeddings = embedder.embed_batch(texts)
+        # Generate embeddings with caching and parallel processing
+        if self.embedding_cache:
+            # Use cache for faster re-indexing with parallel embedding
+            with Embedder() as embedder:
+
+                def compute_fn(missing_texts):
+                    # Use parallel embedding for better performance
+                    return embedder.embed_batch_parallel(missing_texts)
+
+                embeddings, hits, misses = self.embedding_cache.get_or_compute_batch(
+                    texts, compute_fn
+                )
+
+            # Update stats
+            self.stats["cache_hits"] = hits
+            self.stats["cache_misses"] = misses
+
+            if DEBUG:
+                cache_stats = self.embedding_cache.get_stats()
+                print(
+                    f"[Cache] Hits: {hits}, Misses: {misses}, Hit rate: {cache_stats['hit_rate']:.1f}%"
+                )
+
+        else:
+            # No caching (force mode) - still use parallel embedding
+            with Embedder() as embedder:
+                embeddings = embedder.embed_batch_parallel(texts)
 
         return embeddings  # type: ignore[no-any-return]
 
@@ -323,7 +358,7 @@ class Indexer:
                     "end_line": chunk.end_line,
                     "chunk_type": chunk.chunk_type,
                     "context": chunk.context or "",
-                    "content": chunk.content,
+                    # NOTE: Content not stored - always read fresh from filesystem
                     "vector": embedding,
                 }
             )
@@ -338,6 +373,8 @@ class Indexer:
             table.add(data)
         else:
             # Create new table
+            # NOTE: Content not stored to reduce index size (5x smaller)
+            # We always read fresh content from filesystem for accuracy
             schema = pa.schema(
                 [
                     pa.field("id", pa.string()),
@@ -346,7 +383,6 @@ class Indexer:
                     pa.field("end_line", pa.int64()),
                     pa.field("chunk_type", pa.string()),
                     pa.field("context", pa.string()),
-                    pa.field("content", pa.string()),
                     pa.field("vector", pa.list_(pa.float32(), EMBEDDING_DIM)),
                 ]
             )
@@ -362,7 +398,16 @@ class Indexer:
         print(f"Files unchanged:   {self.stats['files_unchanged']}")
         print(f"Files skipped:     {self.stats['files_skipped']}")
         print(f"Chunks created:    {self.stats['chunks_created']}")
-        print(f"Total time:        {self.stats['total_time']:.2f}s")
+
+        # Cache statistics
+        if self.embedding_cache:
+            cache_stats = self.embedding_cache.get_stats()
+            print(f"\n💾 Cache Performance:")
+            print(f"Cache hits:        {cache_stats['hits']} ({cache_stats['hit_rate']:.1f}%)")
+            print(f"Cache misses:      {cache_stats['misses']}")
+            print(f"Cache size:        {cache_stats['size']} embeddings")
+
+        print(f"\n⏱️  Total time:       {self.stats['total_time']:.2f}s")
 
         if self.stats["files_indexed"] > 0:
             avg_time = self.stats["total_time"] / self.stats["files_indexed"]

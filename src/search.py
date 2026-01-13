@@ -53,7 +53,7 @@ class Searcher:
         self.table = self.db.open_table("chunks")
 
     def search(
-        self, query: str, top_k: int = DEFAULT_TOP_K, read_fresh: bool = True
+        self, query: str, top_k: int = DEFAULT_TOP_K
     ) -> List[SearchResult]:
         """
         Search for code chunks semantically similar to the query.
@@ -61,10 +61,12 @@ class Searcher:
         Args:
             query: Search query
             top_k: Number of results to return
-            read_fresh: If True, read fresh content from filesystem
 
         Returns:
             List of search results ordered by relevance
+
+        Note:
+            Content is always read fresh from filesystem for accuracy.
         """
         start_time = time.time()
 
@@ -92,17 +94,13 @@ class Searcher:
         search_results = []
 
         for result in results:
-            # Read fresh content if requested
-            if read_fresh:
-                content, context_before, context_after = self._read_fresh_content(
-                    result["file_path"],
-                    result["start_line"],
-                    result["end_line"],
-                )
-            else:
-                content = result["content"]
-                context_before = ""
-                context_after = ""
+            # Always read fresh content from filesystem
+            # (Content not stored in index for space efficiency)
+            content, context_before, context_after = self._read_fresh_content(
+                result["file_path"],
+                result["start_line"],
+                result["end_line"],
+            )
 
             search_results.append(
                 SearchResult(

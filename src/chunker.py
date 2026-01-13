@@ -27,13 +27,13 @@ class Chunker:
     """Smart code chunker with language-specific support."""
 
     def __init__(self):
-        self.tree_sitter_available = False
+        self.tree_sitter_chunker = None
         try:
-            import tree_sitter  # noqa: F401
-            import tree_sitter_javascript  # noqa: F401
-            import tree_sitter_python  # noqa: F401
+            from src.tree_sitter_chunker import TreeSitterChunker
 
-            self.tree_sitter_available = True
+            ts_chunker = TreeSitterChunker()
+            if ts_chunker.is_available():
+                self.tree_sitter_chunker = ts_chunker
         except ImportError:
             pass
 
@@ -47,6 +47,17 @@ class Chunker:
         Returns:
             List of code chunks
         """
+        # Try tree-sitter first (AST-based, most accurate)
+        if self.tree_sitter_chunker and self.tree_sitter_chunker.can_chunk_file(file_path):
+            try:
+                chunks = self.tree_sitter_chunker.chunk_file(file_path)
+                if chunks:  # Successfully chunked with tree-sitter
+                    return chunks
+            except Exception:
+                # Fall back to regex-based chunking
+                pass
+
+        # Fallback to regex-based chunking
         try:
             content = file_path.read_text(encoding="utf-8", errors="ignore")
         except Exception as e:
