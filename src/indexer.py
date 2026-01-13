@@ -402,7 +402,7 @@ class Indexer:
         # Cache statistics
         if self.embedding_cache:
             cache_stats = self.embedding_cache.get_stats()
-            print(f"\n💾 Cache Performance:")
+            print("\n💾 Cache Performance:")
             print(f"Cache hits:        {cache_stats['hits']} ({cache_stats['hit_rate']:.1f}%)")
             print(f"Cache misses:      {cache_stats['misses']}")
             print(f"Cache size:        {cache_stats['size']} embeddings")

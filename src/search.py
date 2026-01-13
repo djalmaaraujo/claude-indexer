@@ -52,9 +52,7 @@ class Searcher:
         self.db = lancedb.connect(str(self.index_path))
         self.table = self.db.open_table("chunks")
 
-    def search(
-        self, query: str, top_k: int = DEFAULT_TOP_K
-    ) -> List[SearchResult]:
+    def search(self, query: str, top_k: int = DEFAULT_TOP_K) -> List[SearchResult]:
         """
         Search for code chunks semantically similar to the query.
 

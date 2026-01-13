@@ -18,7 +18,7 @@ def is_tree_sitter_available():
 # Skip all tests in this module if tree-sitter is not available
 pytestmark = pytest.mark.skipif(
     not is_tree_sitter_available(),
-    reason="tree-sitter parsers not installed. Install with: pip install -e '.[tree-sitter]'"
+    reason="tree-sitter parsers not installed. Install with: pip install -e '.[tree-sitter]'",
 )
 
 
@@ -55,7 +55,8 @@ class TestTreeSitterChunker:
     def test_chunk_python_function(self, chunker):
         """Test chunking a Python function."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write("""
+            f.write(
+                """
 def calculate_sum(a, b):
     '''Calculate sum of two numbers.
 
@@ -75,7 +76,8 @@ def calculate_product(a, b):
     result = a * b
     print(f"Calculating product: {a} * {b} = {result}")
     return result
-""")
+"""
+            )
             f.flush()
             temp_path = Path(f.name)
 
@@ -97,7 +99,8 @@ def calculate_product(a, b):
     def test_chunk_python_class(self, chunker):
         """Test chunking a Python class."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write("""
+            f.write(
+                """
 class Calculator:
     def __init__(self):
         self.result = 0
@@ -109,7 +112,8 @@ class Calculator:
     def subtract(self, x):
         self.result -= x
         return self.result
-""")
+"""
+            )
             f.flush()
             temp_path = Path(f.name)
 
@@ -129,7 +133,8 @@ class Calculator:
     def test_chunk_python_with_imports(self, chunker):
         """Test that imports are preserved in context."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write("""
+            f.write(
+                """
 import os
 import sys
 from pathlib import Path
@@ -143,7 +148,8 @@ def get_home_dir():
     home = Path.home()
     print(f"Home directory: {home}")
     return home
-""")
+"""
+            )
             f.flush()
             temp_path = Path(f.name)
 
@@ -163,7 +169,8 @@ def get_home_dir():
     def test_chunk_javascript_function(self, chunker):
         """Test chunking JavaScript functions."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".js", delete=False) as f:
-            f.write("""
+            f.write(
+                """
 function calculateSum(a, b) {
     // Calculate the sum of two numbers
     // This is a longer function to meet minimum size
@@ -187,7 +194,8 @@ export function calculateDifference(a, b) {
     console.log(`Difference: ${a} - ${b} = ${result}`);
     return result;
 }
-""")
+"""
+            )
             f.flush()
             temp_path = Path(f.name)
 
@@ -204,7 +212,8 @@ export function calculateDifference(a, b) {
     def test_chunk_javascript_class(self, chunker):
         """Test chunking JavaScript classes."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".js", delete=False) as f:
-            f.write("""
+            f.write(
+                """
 class Calculator {
     constructor() {
         this.result = 0;
@@ -220,7 +229,8 @@ class Calculator {
         return this.result;
     }
 }
-""")
+"""
+            )
             f.flush()
             temp_path = Path(f.name)
 
@@ -238,7 +248,8 @@ class Calculator {
     def test_chunk_respects_min_size(self, chunker):
         """Test that small chunks are filtered out."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write("""
+            f.write(
+                """
 def a():
     pass
 
@@ -248,7 +259,8 @@ def very_long_function_name_that_is_properly_sized():
     for i in range(10):
         result += i
     return result
-""")
+"""
+            )
             f.flush()
             temp_path = Path(f.name)
 
@@ -279,14 +291,16 @@ def very_long_function_name_that_is_properly_sized():
     def test_chunk_line_numbers_accurate(self, chunker):
         """Test that line numbers are accurate."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write("""# Line 1
+            f.write(
+                """# Line 1
 # Line 2
 def function_at_line_3():  # Line 3
     return "hello"  # Line 4
 
 def function_at_line_6():  # Line 6
     return "world"  # Line 7
-""")
+"""
+            )
             f.flush()
             temp_path = Path(f.name)
 

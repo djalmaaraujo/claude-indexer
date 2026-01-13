@@ -30,7 +30,7 @@ class Embedder:
                 # Check if MPS is actually built (not just available)
                 if torch.backends.mps.is_built():
                     device = "mps"
-                    print(f"🚀 GPU detected: Apple Metal (MPS)")
+                    print("🚀 GPU detected: Apple Metal (MPS)")
                 else:
                     device = "cpu"
                     print("⚠️  MPS available but not built, using CPU")
