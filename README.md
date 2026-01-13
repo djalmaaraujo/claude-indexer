@@ -1,5 +1,7 @@
 # Fast Semantic Code Search
 
+![Tests](https://github.com/djalmaaraujo/claude-indexer/actions/workflows/tests.yml/badge.svg)
+
 Beat Cursor's performance with a local RAG-based semantic code search system. Pre-index codebases and inject relevant context into Claude Code **before the first API call**.
 
 **Status:** 🎯 **Goal Achieved** - Consistently delivers <100ms search times (averaging ~65ms)
