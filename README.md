@@ -834,6 +834,12 @@ Pull requests welcome! Please:
 
 ### 🔮 Future Enhancements (Phase 3)
 
+**Developer Experience:**
+
+- 🎯 Auto-index on setup completion - Run `code-index .` automatically after `./setup.sh`
+- 🔌 Claude Code plugin integration (Hard) - Use semantic search directly inside Claude sessions via MCP server, hooks, and slash commands (see [planned-future-implementation.md](./planned-future-implementation.md) for detailed plan)
+- 🧪 Automated testing with multiple LLM providers - Test search quality across different embedding models
+
 **Power Features:**
 
 - Hybrid search (Semantic + BM25 keyword search)
@@ -841,7 +847,7 @@ Pull requests welcome! Please:
 - Merkle tree change detection for 10k+ file repos
 - Additional tree-sitter language support (Go, Rust, Java)
 
-See [IMPLEMENTATION-ROADMAP.md](./IMPLEMENTATION-ROADMAP.md) for detailed progress and benchmarks.
+See [IMPLEMENTATION-ROADMAP.md](./docs/IMPLEMENTATION-ROADMAP.md) for detailed progress and benchmarks.
 
 ## Quick Reference
 
