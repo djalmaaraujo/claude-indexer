@@ -90,21 +90,52 @@ for cmd in code-index ss cc; do
 done
 
 # Add ~/bin to PATH if not already there
-if [[ ":$PATH:" != *":$HOME/bin:"* ]]; then
-    echo -e "\n${YELLOW}Adding ~/bin to PATH...${NC}"
+echo -e "\n${YELLOW}Configuring PATH...${NC}"
 
-    # Detect shell
-    if [ -n "$ZSH_VERSION" ]; then
+# Detect user's actual shell (not the script's shell)
+# Note: We use $SHELL env var, not $BASH_VERSION/$ZSH_VERSION which would
+# always show bash since this script runs in bash (#!/bin/bash)
+USER_SHELL=$(basename "$SHELL")
+SHELL_RC=""
+PATH_LINE='export PATH="$HOME/bin:$PATH"'
+
+case "$USER_SHELL" in
+    zsh)
         SHELL_RC="$HOME/.zshrc"
-    elif [ -n "$BASH_VERSION" ]; then
-        SHELL_RC="$HOME/.bashrc"
-    else
+        ;;
+    bash)
+        # macOS uses .bash_profile, Linux uses .bashrc
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # On macOS, check which file exists or should be used
+            if [ -f "$HOME/.bash_profile" ]; then
+                SHELL_RC="$HOME/.bash_profile"
+            elif [ -f "$HOME/.profile" ]; then
+                SHELL_RC="$HOME/.profile"
+            else
+                SHELL_RC="$HOME/.bash_profile"  # Create if doesn't exist
+            fi
+        else
+            SHELL_RC="$HOME/.bashrc"
+        fi
+        ;;
+    fish)
+        SHELL_RC="$HOME/.config/fish/config.fish"
+        PATH_LINE='set -gx PATH $HOME/bin $PATH'
+        ;;
+    *)
         SHELL_RC="$HOME/.profile"
-    fi
+        ;;
+esac
 
-    echo 'export PATH="$HOME/bin:$PATH"' >> "$SHELL_RC"
-    echo -e "${GREEN}✓ Added to $SHELL_RC${NC}"
-    echo -e "${YELLOW}Run: source $SHELL_RC${NC}"
+# Check if PATH is already configured in the RC file
+if [ -f "$SHELL_RC" ] && grep -q 'PATH.*HOME/bin' "$SHELL_RC" 2>/dev/null; then
+    echo -e "${GREEN}✓ PATH already configured in $SHELL_RC${NC}"
+else
+    # Add PATH to RC file
+    echo "$PATH_LINE" >> "$SHELL_RC"
+    echo -e "${GREEN}✓ Added ~/bin to PATH in $SHELL_RC${NC}"
+    echo -e "${YELLOW}⚠  Run this to activate: source $SHELL_RC${NC}"
+    echo -e "${YELLOW}   Or restart your terminal${NC}"
 fi
 
 # 5. Run self-test
