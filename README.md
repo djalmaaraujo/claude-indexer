@@ -6,6 +6,10 @@ A local RAG-based semantic code search system that enhances Claude with instant 
 
 Build better AI-assisted coding workflows by giving Claude the exact context it needs in under 100ms.
 
+## Understand Claude Indexer (Slides)
+
+[Slides here](https://share.djalma.blog/claude-indexer/)
+
 ## Features
 
 - 🚀 **Lightning Fast**: <100ms semantic search with local vector database (achieves ~65ms average)
@@ -145,31 +149,31 @@ This combines semantic search with Claude Code, automatically injecting relevant
 
 ## Tech Stack
 
-| Component               | Technology                    | Why                                                 |
-| ----------------------- | ----------------------------- | --------------------------------------------------- |
-| **Embeddings**          | sentence-transformers         | Fast, local, no server required                     |
-| **Models**              | MiniLM / CodeBERT / MPNet     | Configurable: speed vs quality vs code-specific     |
-| **Vector DB**           | LanceDB                       | Rust-based, serverless, fast for local ops          |
-| **Chunking**            | Tree-sitter + regex fallback  | AST-aware parsing for precise code understanding    |
-| **Caching**             | Pickle-based embedding cache  | MD5 content hashing, 1.7x faster re-indexing        |
-| **Parallel Processing** | ProcessPoolExecutor + threads | Multi-core CPU + parallel embedding generation      |
-| **GPU Support**         | PyTorch CUDA/MPS detection    | Automatic GPU acceleration (NVIDIA + Apple Silicon) |
-| **CLI**                 | Click                         | Clean, user-friendly interface                      |
-| **Progress**            | Rich                          | Beautiful progress bars with statistics             |
+| Component               | Technology                    | Why                                                        |
+| ----------------------- | ----------------------------- | ---------------------------------------------------------- |
+| **Embeddings**          | sentence-transformers         | Fast, local, no server required                            |
+| **Models**              | MiniLM / CodeBERT / MPNet     | Configurable: speed vs quality vs code-specific            |
+| **Vector DB**           | LanceDB                       | Rust-based, serverless, fast for local ops                 |
+| **Chunking**            | Tree-sitter + regex fallback  | AST-aware parsing for precise code understanding           |
+| **Caching**             | Pickle-based embedding cache  | MD5 content hashing, 1.7x faster re-indexing               |
+| **Parallel Processing** | ProcessPoolExecutor + threads | Multi-core CPU + parallel embedding generation             |
+| **GPU Support**         | PyTorch CUDA/MPS detection    | Automatic GPU acceleration (NVIDIA + Apple Silicon)        |
+| **CLI**                 | Click                         | Clean, user-friendly interface                             |
+| **Progress**            | Rich                          | Beautiful progress bars with statistics                    |
 | **Storage**             | PyArrow + Lance format        | Columnar storage, 4-5x smaller without content duplication |
 
 ## Performance Targets
 
-| Operation              | Target     | Actual   | Status |
-| ---------------------- | ---------- | -------- | ------ |
-| Query embedding        | <50ms      | ~30ms    | ✅     |
-| Vector search          | <20ms      | ~15ms    | ✅     |
-| File read              | <30ms      | ~20ms    | ✅     |
-| **Total search**       | **<100ms** | **~65ms**| ✅     |
-| Index 1k files         | <60s       | ~40s     | ✅     |
-| Re-index (unchanged)   | -          | **1.7x** | ✅     |
-| Index size             | -          | **4-5x smaller** | ✅ |
-| Parallel embedding     | -          | **84 chunks/s**  | ✅ |
+| Operation            | Target     | Actual           | Status |
+| -------------------- | ---------- | ---------------- | ------ |
+| Query embedding      | <50ms      | ~30ms            | ✅     |
+| Vector search        | <20ms      | ~15ms            | ✅     |
+| File read            | <30ms      | ~20ms            | ✅     |
+| **Total search**     | **<100ms** | **~65ms**        | ✅     |
+| Index 1k files       | <60s       | ~40s             | ✅     |
+| Re-index (unchanged) | -          | **1.7x**         | ✅     |
+| Index size           | -          | **4-5x smaller** | ✅     |
+| Parallel embedding   | -          | **84 chunks/s**  | ✅     |
 
 ## Project Structure
 
@@ -504,19 +508,19 @@ graph TD
 
 ### Performance Breakdown
 
-| Phase        | Operation               | Target     | Actual         | Notes                            |
-| ------------ | ----------------------- | ---------- | -------------- | -------------------------------- |
-| **Indexing** | File scanning           | -          | ~100ms         | Depends on project size          |
-|              | Chunking (AST+parallel) | -          | ~2s/1000 files | Tree-sitter + multi-core         |
-|              | Cache lookup            | -          | ~5ms/chunk     | MD5 content hash lookup          |
-|              | Embedding (cached)      | -          | **~0ms**       | **Cache hit = instant**          |
-|              | Embedding (uncached)    | -          | ~50ms/batch    | Parallel generation, 84 chunks/s |
-|              | DB write                | -          | ~100ms         | LanceDB append                   |
-| **Re-index** | Unchanged files         | -          | **1.7x faster**| Embedding cache benefit          |
-| **Search**   | Query embedding         | <50ms      | ✅ ~30ms       | Local inference                  |
-|              | Vector search           | <20ms      | ✅ ~15ms       | LanceDB Rust engine              |
-|              | File read               | <30ms      | ✅ ~20ms       | Fresh content from disk          |
-|              | **Total**               | **<100ms** | **✅ ~65ms**   | Sub-100ms goal achieved          |
+| Phase        | Operation               | Target     | Actual          | Notes                            |
+| ------------ | ----------------------- | ---------- | --------------- | -------------------------------- |
+| **Indexing** | File scanning           | -          | ~100ms          | Depends on project size          |
+|              | Chunking (AST+parallel) | -          | ~2s/1000 files  | Tree-sitter + multi-core         |
+|              | Cache lookup            | -          | ~5ms/chunk      | MD5 content hash lookup          |
+|              | Embedding (cached)      | -          | **~0ms**        | **Cache hit = instant**          |
+|              | Embedding (uncached)    | -          | ~50ms/batch     | Parallel generation, 84 chunks/s |
+|              | DB write                | -          | ~100ms          | LanceDB append                   |
+| **Re-index** | Unchanged files         | -          | **1.7x faster** | Embedding cache benefit          |
+| **Search**   | Query embedding         | <50ms      | ✅ ~30ms        | Local inference                  |
+|              | Vector search           | <20ms      | ✅ ~15ms        | LanceDB Rust engine              |
+|              | File read               | <30ms      | ✅ ~20ms        | Fresh content from disk          |
+|              | **Total**               | **<100ms** | **✅ ~65ms**    | Sub-100ms goal achieved          |
 
 ### Storage Format
 
@@ -601,11 +605,11 @@ claude-indexer **automatically detects and uses GPU acceleration** when availabl
 
 #### Supported Platforms
 
-| Platform | GPU Type | Device | Expected Speedup |
-|----------|----------|--------|------------------|
-| **macOS** | Apple Silicon (M1/M2/M3/M4) | `mps` (Metal Performance Shaders) | **2-3x faster** |
-| **Linux/Windows** | NVIDIA GPU | `cuda` | **6-10x faster** |
-| **Any** | No GPU | `cpu` | baseline |
+| Platform          | GPU Type                    | Device                            | Expected Speedup |
+| ----------------- | --------------------------- | --------------------------------- | ---------------- |
+| **macOS**         | Apple Silicon (M1/M2/M3/M4) | `mps` (Metal Performance Shaders) | **2-3x faster**  |
+| **Linux/Windows** | NVIDIA GPU                  | `cuda`                            | **6-10x faster** |
+| **Any**           | No GPU                      | `cpu`                             | baseline         |
 
 #### How It Works
 
@@ -636,10 +640,10 @@ Loading sentence-transformers model: all-MiniLM-L6-v2
 
 #### Performance Expectations
 
-| Operation | CPU | MPS (Apple Silicon) | CUDA (NVIDIA) |
-|-----------|-----|---------------------|---------------|
-| Embedding 200 chunks | ~2.5s | ~0.8-1.2s | ~0.3-0.4s |
-| Embedding 1000 chunks | ~12s | ~4-5s | ~1.2-1.5s |
+| Operation             | CPU   | MPS (Apple Silicon) | CUDA (NVIDIA) |
+| --------------------- | ----- | ------------------- | ------------- |
+| Embedding 200 chunks  | ~2.5s | ~0.8-1.2s           | ~0.3-0.4s     |
+| Embedding 1000 chunks | ~12s  | ~4-5s               | ~1.2-1.5s     |
 
 **Note**: MPS provides solid speedup on macOS, though not as dramatic as NVIDIA CUDA due to Metal API overhead and unified memory architecture.
 
@@ -808,18 +812,21 @@ Pull requests welcome! Please:
 ### ✅ Recently Completed (Phase 1 & 2)
 
 **Phase 1: Performance Optimizations**
+
 - ✅ Embedding cache with MD5 content hashing (1.7x faster re-indexing)
 - ✅ Parallel embedding generation with ThreadPoolExecutor (84 chunks/s)
 - ✅ GPU auto-detection and acceleration
 - ✅ Removed content storage from vector DB (4-5x smaller indexes)
 
 **Phase 2: Quality Improvements**
+
 - ✅ Tree-sitter AST-based chunking for Python, JavaScript, TypeScript
 - ✅ Multiple embedding model options (MiniLM, CodeBERT, MPNet)
 - ✅ Environment variable for model selection
 - ✅ +8% better chunk detection with AST parsing
 
 **Results:**
+
 - Index size: 360KB (vs ~1.5-2MB before)
 - Re-indexing: 1.7x faster for unchanged files
 - Tests: 77 tests passing (from 51 originally)
@@ -828,6 +835,7 @@ Pull requests welcome! Please:
 ### 🔮 Future Enhancements (Phase 3)
 
 **Power Features:**
+
 - Hybrid search (Semantic + BM25 keyword search)
 - Vector quantization for even smaller indexes
 - Merkle tree change detection for 10k+ file repos
