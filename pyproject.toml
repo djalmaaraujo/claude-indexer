@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "code-search"
+version = "0.1.0"
+description = "Fast semantic code search with local RAG"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    {name = "Code Search Team"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    # Core dependencies
+    "lancedb>=0.5.0",          # Vector database
+    "pyarrow>=15.0.0",         # Arrow for LanceDB
+    "click>=8.1.0",            # CLI framework
+    "rich>=13.7.0",            # Progress bars and formatting
+    "sentence-transformers>=2.2.0",  # Embeddings model
+    "torch>=2.0.0",            # Required by sentence-transformers
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "pytest-benchmark>=4.0.0",
+    "black>=24.0.0",
+    "ruff>=0.3.0",
+    "mypy>=1.9.0",
+]
+tree-sitter = [
+    "tree-sitter>=0.21.0",     # Optional: Enhanced AST-aware chunking
+]
+
+[tool.setuptools]
+packages = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+]
+ignore = [
+    "E501",  # line too long (handled by black)
+]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --tb=short"

@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""
+CLI tool to search code and send results to Claude.
+
+Usage:
+    cc <query>
+    cc "find the authentication middleware"
+    cc "how does error handling work?" -n 10
+"""
+import sys
+import os
+import subprocess
+from pathlib import Path
+
+# Add the package to path (works with symlinks)
+SCRIPT_DIR = Path(__file__).resolve().parent
+PACKAGE_DIR = SCRIPT_DIR.parent
+sys.path.insert(0, str(PACKAGE_DIR))
+
+# Ensure we're using the venv if not already activated
+VENV_PYTHON = PACKAGE_DIR / "venv" / "bin" / "python3"
+if VENV_PYTHON.exists() and sys.executable != str(VENV_PYTHON):
+    # Re-run with venv Python
+    os.execv(str(VENV_PYTHON), [str(VENV_PYTHON)] + sys.argv)
+
+import click
+from src.search import Searcher
+
+
+@click.command()
+@click.argument("query")
+@click.option("-n", "--num", type=int, default=5, help="Number of results (default: 5)")
+@click.option("--project", type=click.Path(exists=True), default=".", help="Project path (default: current directory)")
+def main(query: str, num: int, project: str):
+    """Search code and send results to Claude."""
+    project_path = Path(project).resolve()
+
+    try:
+        # Initialize searcher
+        searcher = Searcher(project_path)
+
+        # Perform search
+        click.echo("🔍 Searching codebase...", err=True)
+        results = searcher.search(query, top_k=num)
+
+        if not results:
+            click.echo("❌ No results found.", err=True)
+            sys.exit(1)
+
+        click.echo(f"✅ Found {len(results)} results\n", err=True)
+
+        # Format results as markdown
+        markdown_output = searcher.format_results_markdown(results)
+
+        # Build the prompt for Claude
+        prompt = f"""Based on the following code search results, please answer: {query}
+
+{markdown_output}
+"""
+
+        # Try to pipe to claude command
+        try:
+            # Check if claude command exists
+            result = subprocess.run(
+                ["which", "claude"],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode != 0:
+                # Claude command not found, just output the results
+                click.echo("⚠️  'claude' command not found. Outputting search results:\n", err=True)
+                click.echo(prompt)
+            else:
+                # Pipe to claude
+                click.echo("🤖 Sending to Claude...\n", err=True)
+                subprocess.run(
+                    ["claude"],
+                    input=prompt,
+                    text=True
+                )
+
+        except Exception as e:
+            # If anything fails, just output the results
+            click.echo(f"⚠️  Could not pipe to Claude: {e}\n", err=True)
+            click.echo(prompt)
+
+    except FileNotFoundError as e:
+        click.echo(f"❌ {e}", err=True)
+        click.echo(f"\nRun: code-index {project}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"❌ Error: {e}", err=True)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

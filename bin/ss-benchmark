@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+"""
+Benchmark semantic search speed.
+Measures query embedding, vector search, and total time.
+"""
+import sys
+import os
+from pathlib import Path
+import time
+import statistics
+
+# Add the package to path (works with symlinks)
+SCRIPT_DIR = Path(__file__).resolve().parent
+PACKAGE_DIR = SCRIPT_DIR.parent
+sys.path.insert(0, str(PACKAGE_DIR))
+
+# Ensure we're using the venv if not already activated
+VENV_PYTHON = PACKAGE_DIR / "venv" / "bin" / "python3"
+if VENV_PYTHON.exists() and sys.executable != str(VENV_PYTHON):
+    os.execv(str(VENV_PYTHON), [str(VENV_PYTHON)] + sys.argv)
+
+import click
+from src.search import Searcher
+
+
+def format_time(ms: float) -> str:
+    """Format milliseconds for display."""
+    if ms < 1:
+        return f"{ms * 1000:.0f}μs"
+    elif ms < 1000:
+        return f"{ms:.1f}ms"
+    else:
+        return f"{ms / 1000:.2f}s"
+
+
+@click.command()
+@click.argument("query")
+@click.option("-n", "--num", type=int, default=5, help="Number of results")
+@click.option("-r", "--runs", type=int, default=10, help="Number of benchmark runs")
+@click.option("--project", type=click.Path(exists=True), default=".", help="Project path")
+@click.option("--warmup", type=int, default=1, help="Warmup runs (not counted)")
+def main(query: str, num: int, runs: int, project: str, warmup: int):
+    """
+    Benchmark semantic search speed.
+
+    Example:
+        ss-benchmark "authentication" -r 10
+        ss-benchmark "database connection" -r 20 --warmup 2
+    """
+    project_path = Path(project).resolve()
+
+    try:
+        click.echo(f"🔍 Benchmarking search: '{query}'")
+        click.echo(f"📁 Project: {project_path}")
+        click.echo(f"🔢 Runs: {runs} (+ {warmup} warmup)")
+        click.echo()
+
+        # Initialize searcher (loads model if needed)
+        click.echo("⏳ Initializing searcher (loading model)...")
+        init_start = time.time()
+        searcher = Searcher(project_path)
+        init_time = (time.time() - init_start) * 1000
+        click.echo(f"✓ Initialized in {format_time(init_time)}\n")
+
+        # Warmup runs
+        if warmup > 0:
+            click.echo(f"🔥 Warming up ({warmup} runs)...")
+            for i in range(warmup):
+                searcher.search(query, top_k=num, read_fresh=False)
+            click.echo("✓ Warmup complete\n")
+
+        # Benchmark runs
+        click.echo(f"⚡ Running benchmark ({runs} runs)...")
+        times = []
+
+        for i in range(runs):
+            start = time.time()
+            results = searcher.search(query, top_k=num, read_fresh=True)
+            elapsed = (time.time() - start) * 1000
+            times.append(elapsed)
+
+            if i == 0:
+                click.echo(f"   Results found: {len(results)}")
+
+        # Calculate statistics
+        avg_time = statistics.mean(times)
+        median_time = statistics.median(times)
+        min_time = min(times)
+        max_time = max(times)
+        stdev = statistics.stdev(times) if len(times) > 1 else 0
+
+        # P95 and P99
+        sorted_times = sorted(times)
+        p95_idx = int(len(sorted_times) * 0.95)
+        p99_idx = int(len(sorted_times) * 0.99)
+        p95_time = sorted_times[p95_idx]
+        p99_time = sorted_times[p99_idx]
+
+        # Display results
+        click.echo("\n" + "=" * 60)
+        click.echo("📊 BENCHMARK RESULTS")
+        click.echo("=" * 60)
+        click.echo(f"Query:        {query}")
+        click.echo(f"Results:      {num}")
+        click.echo(f"Runs:         {runs}")
+        click.echo()
+        click.echo(f"Min time:     {format_time(min_time)}")
+        click.echo(f"Max time:     {format_time(max_time)}")
+        click.echo(f"Avg time:     {format_time(avg_time)}")
+        click.echo(f"Median:       {format_time(median_time)}")
+        click.echo(f"Std dev:      {format_time(stdev)}")
+        click.echo(f"P95:          {format_time(p95_time)}")
+        click.echo(f"P99:          {format_time(p99_time)}")
+        click.echo()
+
+        # Throughput
+        queries_per_sec = 1000 / avg_time
+        click.echo(f"Throughput:   {queries_per_sec:.1f} queries/sec")
+        click.echo()
+
+        # Performance rating
+        if avg_time < 50:
+            rating = "🚀 EXCELLENT"
+            color = "green"
+        elif avg_time < 100:
+            rating = "✅ GOOD (Target Met)"
+            color = "green"
+        elif avg_time < 200:
+            rating = "⚠️  ACCEPTABLE"
+            color = "yellow"
+        else:
+            rating = "❌ SLOW"
+            color = "red"
+
+        click.echo(f"Performance:  {rating}")
+        click.echo("=" * 60)
+
+        # Compare with Cursor baseline
+        cursor_baseline = 100  # ms
+        if avg_time < cursor_baseline:
+            speedup = cursor_baseline / avg_time
+            click.echo(f"\n🎉 {speedup:.1f}x FASTER than Cursor baseline ({cursor_baseline}ms)")
+        elif avg_time == cursor_baseline:
+            click.echo(f"\n✓ Same speed as Cursor baseline ({cursor_baseline}ms)")
+        else:
+            slowdown = avg_time / cursor_baseline
+            click.echo(f"\n📊 {slowdown:.1f}x slower than Cursor baseline ({cursor_baseline}ms)")
+
+        click.echo()
+
+    except FileNotFoundError as e:
+        click.echo(f"❌ {e}", err=True)
+        click.echo(f"\nRun: code-index {project}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"❌ Error: {e}", err=True)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

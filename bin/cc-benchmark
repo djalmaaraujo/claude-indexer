@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""
+Benchmark the complete workflow: search + Claude response.
+This is what users actually experience end-to-end.
+"""
+import sys
+import os
+from pathlib import Path
+import time
+import subprocess
+
+# Add the package to path (works with symlinks)
+SCRIPT_DIR = Path(__file__).resolve().parent
+PACKAGE_DIR = SCRIPT_DIR.parent
+sys.path.insert(0, str(PACKAGE_DIR))
+
+# Ensure we're using the venv if not already activated
+VENV_PYTHON = PACKAGE_DIR / "venv" / "bin" / "python3"
+if VENV_PYTHON.exists() and sys.executable != str(VENV_PYTHON):
+    os.execv(str(VENV_PYTHON), [str(VENV_PYTHON)] + sys.argv)
+
+import click
+from src.search import Searcher
+
+
+def format_time(seconds: float) -> str:
+    """Format seconds for display."""
+    ms = seconds * 1000
+    if ms < 1000:
+        return f"{ms:.0f}ms"
+    else:
+        return f"{seconds:.2f}s"
+
+
+@click.command()
+@click.argument("query")
+@click.option("-n", "--num", type=int, default=5, help="Number of search results")
+@click.option("--project", type=click.Path(exists=True), default=".", help="Project path")
+@click.option("--no-claude", is_flag=True, help="Skip Claude call (just time search)")
+def main(query: str, num: int, project: str, no_claude: bool):
+    """
+    Benchmark the complete search → Claude workflow.
+
+    This measures:
+    1. Search time (finding relevant code)
+    2. Claude API time (generating response)
+    3. Total end-to-end time
+
+    Example:
+        cc-benchmark "explain the authentication flow"
+        cc-benchmark "how does error handling work?" -n 10
+        cc-benchmark "database connection" --no-claude  # Just search
+    """
+    project_path = Path(project).resolve()
+
+    try:
+        click.echo("=" * 70)
+        click.echo("🔍 SEARCH + CLAUDE BENCHMARK")
+        click.echo("=" * 70)
+        click.echo(f"Query:   {query}")
+        click.echo(f"Project: {project_path}")
+        click.echo(f"Results: {num}")
+        click.echo()
+
+        # Phase 1: Search
+        click.echo("📦 Phase 1: Semantic Search")
+        click.echo("-" * 70)
+
+        search_start = time.time()
+        searcher = Searcher(project_path)
+        results = searcher.search(query, top_k=num, read_fresh=True)
+        search_time = time.time() - search_start
+
+        click.echo(f"✓ Found {len(results)} results in {format_time(search_time)}")
+
+        # Show what was found
+        if results:
+            click.echo("\nTop results:")
+            for i, result in enumerate(results[:3], 1):
+                click.echo(f"  {i}. {result.file_path}:{result.start_line} ({result.chunk_type})")
+
+        click.echo()
+
+        # Phase 2: Claude (if not skipped)
+        claude_time = 0
+        total_time = search_time
+
+        if not no_claude:
+            click.echo("🤖 Phase 2: Claude API Call")
+            click.echo("-" * 70)
+
+            # Format results as markdown
+            markdown_output = searcher.format_results_markdown(results)
+
+            # Build the prompt
+            prompt = f"""Based on the following code search results, please answer: {query}
+
+{markdown_output}
+"""
+
+            # Check if claude command exists
+            result = subprocess.run(
+                ["which", "claude"],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode != 0:
+                click.echo("⚠️  'claude' command not found")
+                click.echo("   Install: https://github.com/anthropics/anthropic-quickstarts")
+                click.echo(f"\n   Search completed in {format_time(search_time)}")
+                return
+
+            # Time the Claude call
+            click.echo("⏳ Sending to Claude...")
+            claude_start = time.time()
+
+            result = subprocess.run(
+                ["claude"],
+                input=prompt,
+                text=True,
+                capture_output=True
+            )
+
+            claude_time = time.time() - claude_start
+            total_time = search_time + claude_time
+
+            click.echo(f"✓ Claude responded in {format_time(claude_time)}")
+
+            # Show response preview
+            if result.stdout:
+                response_preview = result.stdout[:200].strip()
+                if len(result.stdout) > 200:
+                    response_preview += "..."
+                click.echo(f"\nResponse preview:\n{response_preview}")
+
+            click.echo()
+
+        # Final Summary
+        click.echo("=" * 70)
+        click.echo("📊 TIMING BREAKDOWN")
+        click.echo("=" * 70)
+        click.echo(f"Search time:      {format_time(search_time)}")
+
+        if not no_claude:
+            click.echo(f"Claude time:      {format_time(claude_time)}")
+            click.echo(f"{'─' * 70}")
+            click.echo(f"Total time:       {format_time(total_time)}")
+
+            # Performance analysis
+            search_pct = (search_time / total_time) * 100
+            claude_pct = (claude_time / total_time) * 100
+
+            click.echo()
+            click.echo("Breakdown:")
+            click.echo(f"  Search:  {search_pct:5.1f}% of total time")
+            click.echo(f"  Claude:  {claude_pct:5.1f}% of total time")
+
+            click.echo()
+            if search_time < 0.1:  # Less than 100ms
+                click.echo("✅ Search is VERY FAST (<100ms)")
+            elif search_time < 0.5:
+                click.echo("✅ Search is fast (<500ms)")
+            else:
+                click.echo("⚠️  Search took longer than expected")
+
+            if total_time < 5:
+                click.echo("✅ Total response time is EXCELLENT (<5s)")
+            elif total_time < 10:
+                click.echo("✅ Total response time is good (<10s)")
+            else:
+                click.echo("⚠️  Total response time is slow (>10s)")
+
+        click.echo("=" * 70)
+
+    except FileNotFoundError as e:
+        click.echo(f"❌ {e}", err=True)
+        click.echo(f"\nRun: code-index {project}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"❌ Error: {e}", err=True)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

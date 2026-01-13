@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+"""
+CLI tool for semantic code search.
+
+Usage:
+    ss <query> [-n NUM] [--json] [--no-context]
+    ss "find authentication middleware"
+    ss "database connection" -n 10
+    ss "error handling" --json
+"""
+import sys
+import os
+from pathlib import Path
+
+# Add the package to path (works with symlinks)
+SCRIPT_DIR = Path(__file__).resolve().parent
+PACKAGE_DIR = SCRIPT_DIR.parent
+sys.path.insert(0, str(PACKAGE_DIR))
+
+# Ensure we're using the venv if not already activated
+VENV_PYTHON = PACKAGE_DIR / "venv" / "bin" / "python3"
+if VENV_PYTHON.exists() and sys.executable != str(VENV_PYTHON):
+    # Re-run with venv Python
+    os.execv(str(VENV_PYTHON), [str(VENV_PYTHON)] + sys.argv)
+
+import click
+from src.search import Searcher
+
+
+@click.command()
+@click.argument("query")
+@click.option("-n", "--num", type=int, default=5, help="Number of results (default: 5)")
+@click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option("--no-context", is_flag=True, help="Don't include surrounding context")
+@click.option("--project", type=click.Path(exists=True), default=".", help="Project path (default: current directory)")
+def main(query: str, num: int, output_json: bool, no_context: bool, project: str):
+    """Semantic search in indexed codebase."""
+    project_path = Path(project).resolve()
+
+    try:
+        # Initialize searcher
+        searcher = Searcher(project_path)
+
+        # Perform search
+        results = searcher.search(query, top_k=num)
+
+        if not results:
+            click.echo("No results found.", err=True)
+            sys.exit(0)
+
+        # Format output
+        if output_json:
+            output = searcher.format_results_json(results)
+        else:
+            output = searcher.format_results_markdown(results, include_context=not no_context)
+
+        click.echo(output)
+
+    except FileNotFoundError as e:
+        click.echo(f"❌ {e}", err=True)
+        click.echo(f"\nRun: code-index {project}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"❌ Error: {e}", err=True)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
