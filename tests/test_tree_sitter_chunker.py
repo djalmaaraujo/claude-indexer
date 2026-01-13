@@ -8,6 +8,20 @@ import pytest
 from src.tree_sitter_chunker import TreeSitterChunker
 
 
+# Check if tree-sitter is available
+def is_tree_sitter_available():
+    """Check if tree-sitter parsers are installed."""
+    chunker = TreeSitterChunker()
+    return chunker.is_available()
+
+
+# Skip all tests in this module if tree-sitter is not available
+pytestmark = pytest.mark.skipif(
+    not is_tree_sitter_available(),
+    reason="tree-sitter parsers not installed. Install with: pip install -e '.[tree-sitter]'"
+)
+
+
 @pytest.fixture
 def chunker():
     """Create a tree-sitter chunker instance."""
