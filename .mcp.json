@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "semantic-search": {
+      "command": "/Users/djalmaaraujo/dev/claude-indexer/venv/bin/python3",
+      "args": [
+        "/Users/djalmaaraujo/dev/claude-indexer/mcp-server/server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/Users/djalmaaraujo/dev/claude-indexer"
+      }
+    }
+  }
+}

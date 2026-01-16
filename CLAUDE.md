@@ -1,12 +1,10 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with this repository.
 
 ## Project Overview
 
-This is a **local RAG-based semantic code search system** that beats Cursor's performance by pre-indexing codebases and enabling instant semantic search (<100ms, averaging ~65ms). It uses sentence-transformers for embeddings (no external services required) and LanceDB for vector storage.
-
-**Key Achievement**: Semantic code search with fresh file content at search time, enabling incremental updates without full re-indexing.
+A **local RAG-based semantic code search system** with MCP integration for Claude Code. Pre-indexes codebases for instant semantic search (<100ms, ~65ms average). Uses sentence-transformers for embeddings and LanceDB for vector storage - no external services required.
 
 ## Development Commands
 
@@ -33,13 +31,7 @@ ruff check src/ tests/        # Lint code
 mypy src/                     # Type checking
 ```
 
-### Benchmarking
-```bash
-./benchmark.py                # Benchmark current directory
-./benchmark.py /path/to/proj  # Benchmark specific project
-```
-
-### CLI Usage (after setup)
+### CLI Usage
 ```bash
 code-index .                  # Index current directory (incremental)
 code-index . --force          # Force full re-index
@@ -58,32 +50,37 @@ cc "query"                    # Search and send to Claude Code
    - Embedding model: `all-MiniLM-L6-v2` (384-dim, sentence-transformers)
    - Chunking: 1500 chars with 200 char overlap
    - Index storage: `~/.code-search/indexes/{project_hash}/`
-   - Supported file extensions and skip patterns
 
-2. **chunker.py** - AST-aware code splitting
-   - **Python**: Regex-based extraction of classes, methods, functions with import context
-   - **JavaScript/TypeScript**: Pattern matching for functions, classes, arrow functions
-   - **Ruby**: Class and method extraction with `end` matching
-   - **Fallback**: Line-based chunking with overlap for unsupported languages
+2. **chunker.py** + **tree_sitter_chunker.py** - Code splitting
+   - Tree-sitter AST parsing for Python, JavaScript, TypeScript
+   - Regex fallback for other languages
    - Returns `CodeChunk` dataclass with file_path, start_line, end_line, chunk_type, context
 
-3. **embedder.py** - Dual backend embedding generation
-   - **Default**: sentence-transformers (local, no server, 384-dim)
-   - **Optional**: Ollama backend (768-dim, requires service)
-   - Batch processing with connection pooling
-   - Switch via `EMBEDDING_BACKEND` environment variable
+3. **embedder.py** - Embedding generation
+   - sentence-transformers (local, 384-dim)
+   - GPU auto-detection (CUDA/MPS)
+   - Batch processing with caching
 
-4. **indexer.py** - Parallel indexing with incremental updates
-   - Uses `ProcessPoolExecutor` with `MAX_WORKERS = cpu_count()`
-   - **Incremental logic**: Three-tier change detection (mtime → size → hash)
-   - Stores metadata in `metadata.json` alongside vector DB
-   - LanceDB schema: `id, file_path, start_line, end_line, chunk_type, context, content, vector`
+4. **indexer.py** - Parallel indexing
+   - `ProcessPoolExecutor` with `MAX_WORKERS = cpu_count()`
+   - Three-tier change detection (mtime → size → hash)
+   - Stores metadata in `metadata.json`
 
-5. **search.py** - Fast semantic search with fresh content
-   - **Critical design**: Vector search finds chunks, then reads fresh file content from disk
-   - This enables incremental updates without stale results
-   - Cosine similarity search in LanceDB
-   - Returns `SearchResult` with file paths, line numbers, scores, content
+5. **search.py** - Semantic search
+   - Vector search finds chunks, reads fresh file content from disk
+   - Cosine similarity in LanceDB
+   - Returns `SearchResult` with file paths, line numbers, scores
+
+### MCP Server
+
+**Location**: `mcp-server/server.py`
+
+Exposes three tools for Claude Code:
+- `search_code(query, num_results)` - Semantic search, returns up to 3000 chars per result
+- `get_index_status()` - Check if index exists
+- `reindex_project(force)` - Trigger indexing
+
+**Registration**: Project-level `.mcp.json` or via `claude-integration/install.sh`
 
 ### Data Flow
 
@@ -99,97 +96,82 @@ Query → embed (< 50ms) → LanceDB vector search (< 20ms)
 → read fresh file content (< 30ms) → return results (total: ~65ms)
 ```
 
-**Incremental Updates**:
-```
-Check metadata.json → compare mtime/size/hash → only re-process changed files
-→ append new chunks to LanceDB → update metadata.json
-```
-
 ## Key Design Decisions
 
-### Why Fresh Content Reads?
-Vector DB only stores embeddings and metadata (file_path, line numbers). Actual code is read from disk at search time. This enables:
+### Fresh Content Reads
+Vector DB stores only embeddings and metadata. Actual code is read from disk at search time:
 - No stale search results
 - Smaller index size
 - Incremental updates without full re-indexing
 
-### Why sentence-transformers as Default?
-- No external service required (Ollama needs separate installation)
-- Pure Python, works immediately after `pip install`
-- 384-dim vectors: good quality with better performance than 768-dim
-- Lower memory footprint
+### MCP Content Size
+`search_code` returns up to 3000 chars per result to reduce follow-up Read() calls while keeping responses reasonable.
 
-### Index Storage Location
+### Index Storage
 `~/.code-search/indexes/{project_hash}/` where `project_hash = md5(absolute_path)[:16]`
-- Enables multi-project support
-- Each project gets isolated storage
-- Indexes persist across sessions
 
 ## Configuration
 
-All tunable parameters in `src/config.py`:
-- `CHUNK_SIZE = 1500` - Maximum chunk size in characters
-- `CHUNK_OVERLAP = 200` - Overlap between chunks for context
-- `DEFAULT_TOP_K = 5` - Default number of search results
-- `MAX_WORKERS = cpu_count()` - Parallel processing workers
-- `CODE_EXTENSIONS` - Set of file extensions to index
-- `SKIP_DIRS` - Directories to skip (node_modules, venv, .git, etc.)
+Key parameters in `src/config.py`:
+- `CHUNK_SIZE = 1500` - Maximum chunk size
+- `CHUNK_OVERLAP = 200` - Overlap between chunks
+- `DEFAULT_TOP_K = 5` - Default search results
+- `MAX_WORKERS = cpu_count()` - Parallel workers
+- `CODE_EXTENSIONS` - File extensions to index
+- `SKIP_DIRS` - Directories to skip
 
-## CLI Binaries
+## File Locations
 
-Located in `bin/`:
-- `code-index` - Indexing CLI (calls `src/indexer.py`)
-- `ss` - Search CLI (calls `src/search.py`)
-- `cc` - Search + Claude integration
-- `ss-benchmark` / `cc-benchmark` - Performance testing
+```
+src/
+├── config.py                 # Settings
+├── embedder.py               # Embedding generation
+├── embedding_cache.py        # Content-hash caching
+├── chunker.py                # Regex chunking (fallback)
+├── tree_sitter_chunker.py    # AST chunking (Python, JS, TS)
+├── indexer.py                # Parallel indexing
+└── search.py                 # Vector search
 
-These are symlinked to `~/bin/` by `setup.sh` for global access.
+mcp-server/
+└── server.py                 # MCP server for Claude Code
 
-## Future Integration: Claude Code Plugin (planned-future-implementation.md)
+claude-integration/
+├── hooks/auto-index.sh       # SessionStart hook
+└── install.sh                # MCP installer
 
-A comprehensive plan exists for deep Claude Code integration:
-- **SessionStart Hook**: Auto-index on session start (background, non-blocking)
-- **MCP Server**: Expose semantic search as tools Claude can call automatically
-- **Skill**: Automatic recognition of "find X" / "where is X" queries
-- **Slash Commands**: `/search`, `/reindex`, `/index-status`
-
-Estimated effort: 4-6 hours. See `planned-future-implementation.md` for full checklist.
-
-## Performance Targets
-
-- Query embedding: <50ms ✅
-- Vector search: <20ms ✅
-- File read: <30ms ✅
-- **Total search: <100ms ✅** (achieves ~65ms)
-- Index 1k files: <60s ✅
+bin/
+├── code-index                # Indexing CLI
+├── ss                        # Search CLI
+└── cc                        # Search + Claude CLI
+```
 
 ## Working with the Codebase
 
-### Adding New Language Support
-Edit `src/chunker.py`:
-1. Add regex patterns for language constructs (classes, functions, etc.)
-2. Implement language-specific chunking method (e.g., `_chunk_rust()`)
-3. Add file extensions to `CODE_EXTENSIONS` in `src/config.py`
-4. Add tests in `tests/test_chunker.py`
+### Adding Language Support
+1. Add tree-sitter grammar to `tree_sitter_chunker.py` or regex patterns to `chunker.py`
+2. Add file extensions to `CODE_EXTENSIONS` in `config.py`
+3. Add tests in `tests/`
 
-### Modifying Embedding Backend
-Edit `src/embedder.py`:
-1. Implement new backend in `_init_*()` and `_embed_*()` methods
-2. Update `EMBEDDING_BACKEND` options in `src/config.py`
-3. Update `EMBEDDING_DIM` based on model dimensions
+### Modifying MCP Server
+Edit `mcp-server/server.py`:
+- Tools are defined with `@mcp.tool()` decorator
+- Returns JSON strings
+- Uses `Searcher` and `Indexer` classes from `src/`
 
-### Changing Storage Backend
-Currently uses LanceDB. To swap:
-1. Modify `src/indexer.py` `_store_in_db()` method
-2. Modify `src/search.py` to use new vector search API
-3. Update schema in both files to match new backend
+## Performance Targets
+
+- Query embedding: <50ms
+- Vector search: <20ms
+- File read: <30ms
+- **Total search: <100ms** (achieves ~65ms)
+- Index 1k files: <60s
 
 ## Troubleshooting
 
-**Slow first search**: Embedding model loads on first use (~2s for sentence-transformers)
+**Slow first search**: Embedding model loads on first use (~2s)
 
 **Index not found**: Run `code-index .` in project directory
 
-**Out of memory during indexing**: Reduce `MAX_WORKERS` in `src/config.py`
+**MCP not available**: Restart Claude Code after `install.sh`
 
-**Wrong search results**: Force re-index with `code-index . --force` (switches backends or fixes corruption)
+**Out of memory**: Reduce `MAX_WORKERS` in `src/config.py`
